@@ -1,0 +1,98 @@
+export const projects = [
+  {
+    id: 1,
+    name: 'פרויקט מגדל הים',
+    location: 'תל אביב, רחוב הים 12',
+    status: 'active',
+    progress: 65,
+    budget: 4500000,
+    spent: 2925000,
+    startDate: '2025-01-15',
+    endDate: '2026-06-30',
+    manager: 'יוסי כהן',
+    workers: 42,
+    tasks: { total: 38, done: 25, inProgress: 8, pending: 5 },
+  },
+  {
+    id: 2,
+    name: 'שיפוץ בית ספר אלון',
+    location: 'רמת גן, רחוב השקד 5',
+    status: 'active',
+    progress: 30,
+    budget: 1200000,
+    spent: 360000,
+    startDate: '2025-03-01',
+    endDate: '2025-12-31',
+    manager: 'דנה לוי',
+    workers: 18,
+    tasks: { total: 24, done: 7, inProgress: 5, pending: 12 },
+  },
+  {
+    id: 3,
+    name: 'מרכז קניות הצפון',
+    location: 'חיפה, דרך העצמאות 100',
+    status: 'planning',
+    progress: 5,
+    budget: 8000000,
+    spent: 400000,
+    startDate: '2025-06-01',
+    endDate: '2027-01-31',
+    manager: 'אמיר בן דוד',
+    workers: 0,
+    tasks: { total: 12, done: 1, inProgress: 2, pending: 9 },
+  },
+  {
+    id: 4,
+    name: 'גשר נהר הירדן',
+    location: 'בקעת הירדן',
+    status: 'completed',
+    progress: 100,
+    budget: 3200000,
+    spent: 3150000,
+    startDate: '2024-01-01',
+    endDate: '2025-04-30',
+    manager: 'רחל גולדשטיין',
+    workers: 0,
+    tasks: { total: 45, done: 45, inProgress: 0, pending: 0 },
+  },
+];
+
+export const workers = [
+  { id: 1, name: 'משה אברהם', role: 'קבלן ראשי', project: 'פרויקט מגדל הים', phone: '050-1234567', status: 'active' },
+  { id: 2, name: 'שרה יוסף', role: 'מהנדסת', project: 'פרויקט מגדל הים', phone: '052-9876543', status: 'active' },
+  { id: 3, name: 'אלי שמש', role: 'חשמלאי', project: 'שיפוץ בית ספר אלון', phone: '054-1112222', status: 'active' },
+  { id: 4, name: 'נועה פרץ', role: 'אדריכלית', project: 'מרכז קניות הצפון', phone: '058-3334444', status: 'inactive' },
+  { id: 5, name: 'גבי מזרחי', role: 'פועל בניין', project: 'פרויקט מגדל הים', phone: '050-5556666', status: 'active' },
+];
+
+export const tasks = [
+  { id: 1, title: 'יציקת יסודות קומה 3', project: 'פרויקט מגדל הים', assignee: 'משה אברהם', priority: 'high', status: 'inProgress', due: '2025-05-20' },
+  { id: 2, title: 'התקנת מערכת חשמל', project: 'שיפוץ בית ספר אלון', assignee: 'אלי שמש', priority: 'medium', status: 'pending', due: '2025-06-01' },
+  { id: 3, title: 'בדיקת תשתיות ביוב', project: 'פרויקט מגדל הים', assignee: 'שרה יוסף', priority: 'high', status: 'done', due: '2025-04-15' },
+  { id: 4, title: 'אישורי בנייה עירוניים', project: 'מרכז קניות הצפון', assignee: 'נועה פרץ', priority: 'high', status: 'inProgress', due: '2025-05-30' },
+  { id: 5, title: 'צביעת חדרי כיתה', project: 'שיפוץ בית ספר אלון', assignee: 'גבי מזרחי', priority: 'low', status: 'pending', due: '2025-07-01' },
+  { id: 6, title: 'התקנת חלונות קומה 5', project: 'פרויקט מגדל הים', assignee: 'משה אברהם', priority: 'medium', status: 'inProgress', due: '2025-05-25' },
+];
+
+export const subcontractors = [
+  { id: 1,  name: 'דוד כהן',     company: 'כהן צביעה בע"מ',      trade: 'צביעה',      phone: '050-1111111', project: 'פרויקט מגדל הים' },
+  { id: 2,  name: 'יוסי לוי',    company: 'אלומיניום לוי',        trade: 'אלומיניום',  phone: '052-2222222', project: 'פרויקט מגדל הים' },
+  { id: 3,  name: 'מאיר ברק',    company: 'ברק קרמיקה',           trade: 'קרמיקה',     phone: '054-3333333', project: 'שיפוץ בית ספר אלון' },
+  { id: 4,  name: 'אבי גפן',     company: 'גפן גבס ובנייה יבשה',  trade: 'גבס',        phone: '058-4444444', project: 'פרויקט מגדל הים' },
+  { id: 5,  name: 'רון שלום',    company: 'שלום אינסטלציה',       trade: 'אינסטלציה',  phone: '050-5555555', project: 'מרכז קניות הצפון' },
+  { id: 6,  name: 'נדב אור',     company: 'אור חשמל ותקשורת',     trade: 'חשמל',       phone: '052-6666666', project: 'שיפוץ בית ספר אלון' },
+  { id: 7,  name: 'גיל שמואל',   company: 'שמואל ריצוף',          trade: 'ריצוף',      phone: '054-7777777', project: 'פרויקט מגדל הים' },
+  { id: 8,  name: 'עמי כץ',      company: 'כץ מסגרות ומתכת',      trade: 'מסגרות',     phone: '058-8888888', project: 'מרכז קניות הצפון' },
+  { id: 9,  name: 'יעקב נחום',   company: 'נחום גינון ונוף',      trade: 'גינון',      phone: '050-9999999', project: 'שיפוץ בית ספר אלון' },
+  { id: 10, name: 'חיים רוזן',   company: 'רוזן בנייה כללית',     trade: 'בנייה',      phone: '052-0000000', project: 'פרויקט מגדל הים' },
+  { id: 11, name: 'אילן פרידמן', company: 'פרידמן טיח וצבע',      trade: 'טיח',        phone: '054-1010101', project: 'מרכז קניות הצפון' },
+  { id: 12, name: 'בועז ניסים',  company: 'ניסים נגרות ומטבחים',  trade: 'נגרות',      phone: '058-1212121', project: 'פרויקט מגדל הים' },
+];
+
+export const materials = [
+  { id: 1, name: 'בטון B30', unit: 'מ"ק', quantity: 450, used: 280, cost: 320 },
+  { id: 2, name: 'ברזל 12 מ"מ', unit: 'טון', quantity: 80, used: 52, cost: 4200 },
+  { id: 3, name: 'לבנים סיליקט', unit: "אלף יח'", quantity: 120, used: 35, cost: 1800 },
+  { id: 4, name: 'צבע חיצוני', unit: 'ליטר', quantity: 2000, used: 600, cost: 45 },
+  { id: 5, name: 'צינורות PVC 110', unit: 'מטר', quantity: 1500, used: 800, cost: 28 },
+];
