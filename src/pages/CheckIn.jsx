@@ -361,6 +361,23 @@ function TabMessages({ msgs, uid, onRead }) {
             </div>
           </div>
           <p style={{ margin: 0, fontSize: 14, color: '#cbd5e1', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{selected.body}</p>
+
+          {selected.photos?.length > 0 && (
+            <div style={{ marginTop: 18, padding: '12px 14px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: '#475569' }}>📎 תמונות מצורפות</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {selected.photos.map((photo, i) => (
+                  <a key={i} href={photo.data} target="_blank" rel="noreferrer">
+                    <img
+                      src={photo.data}
+                      alt={photo.name}
+                      style={{ width: 96, height: 74, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', display: 'block' }}
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Message list */

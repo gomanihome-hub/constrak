@@ -164,6 +164,25 @@ export default function Messages() {
               <div style={{ fontSize: 15, color: '#374151', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
                 {selected.body}
               </div>
+
+              {selected.photos?.length > 0 && (
+                <div style={{ marginTop: 22, padding: '14px 16px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                  <p style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 600, color: '#64748b' }}>📎 תמונות מצורפות ({selected.photos.length})</p>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {selected.photos.map((photo, i) => (
+                      <a key={i} href={photo.data} target="_blank" rel="noreferrer">
+                        <img
+                          src={photo.data}
+                          alt={photo.name}
+                          style={{ width: 130, height: 100, objectFit: 'cover', borderRadius: 9, border: '2px solid #e2e8f0', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.12)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

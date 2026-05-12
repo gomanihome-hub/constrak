@@ -68,6 +68,7 @@ export function isVisibleTo(msg, systemUser, role) {
   if (!systemUser) return false;
   switch (msg.toScope) {
     case 'broadcast': return true;
+    case 'role':      return systemUser.role === msg.toId;
     case 'project':   return (systemUser.assignedProjects ?? []).includes(msg.toId);
     case 'site':      return systemUser.assignedSite === msg.toId;
     case 'user':      return systemUser.id === msg.toId;
@@ -93,6 +94,10 @@ export function roleLabel(role) {
 
 export function scopeLabel(msg) {
   if (msg.toScope === 'broadcast') return '📢 כל המשתמשים';
+  if (msg.toScope === 'role') {
+    const labels = { admin: 'מנהלי מערכת', project_manager: 'מנהלי פרויקט', site_manager: 'מנהלי אתר', subcontractor: 'קבלני משנה', worker: 'פועלים' };
+    return `👥 ${labels[msg.toId] ?? msg.toId}`;
+  }
   if (msg.toScope === 'project') {
     const p = PROJECTS.find(x => x.id === msg.toId);
     return `🏗️ ${p?.name ?? msg.toId}`;

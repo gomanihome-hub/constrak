@@ -9,6 +9,7 @@ const ALL_NAV = [
   { id: 'materials', label: 'חומרים',            icon: '📦', permission: 'viewMaterials'  },
   { id: 'worklog',   label: 'יומן עבודה יומי',  icon: '📋', permission: 'viewWorkLog'    },
   { id: 'messages',  label: 'הודעות',            icon: '💬', permission: 'sendMessage'    },
+  { id: 'megaphone', label: 'מגפון',             icon: '📢', permission: 'sendBroadcast'  },
   { id: 'admin',     label: 'ניהול משתמשים',    icon: '⚙️', permission: 'viewAdminPanel' },
 ];
 

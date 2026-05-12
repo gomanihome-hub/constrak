@@ -16,6 +16,7 @@ import AdminPanel from './pages/AdminPanel';
 import CheckIn from './pages/CheckIn';
 import MyReport from './pages/MyReport';
 import Messages from './pages/Messages';
+import Megaphone from './pages/Megaphone';
 import './index.css';
 
 const FULL_PAGES = {
@@ -26,6 +27,7 @@ const FULL_PAGES = {
   materials: Materials,
   worklog:   WorkLog,
   messages:  Messages,
+  megaphone: Megaphone,
   admin:     AdminPanel,
 };
 

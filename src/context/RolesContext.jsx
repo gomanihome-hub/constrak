@@ -152,6 +152,7 @@ export function RolesProvider({ children }) {
     viewWorkLog:    ['admin','project_manager','site_manager'].includes(currentRole),
     viewMessages:   true,  // everyone sees messages addressed to them
     sendMessage:    ['admin','project_manager','site_manager'].includes(currentRole),
+    sendBroadcast:  ['admin','project_manager'].includes(currentRole),
     submitReport:   currentRole === 'subcontractor',
     workerReport:   currentRole === 'worker',
     checkIn:        currentRole === 'worker',
