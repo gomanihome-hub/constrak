@@ -1,8 +1,9 @@
 import { createContext, useContext, useState } from 'react';
 
 // ─── Storage keys ────────────────────────────────────────────────────────────
-const SESSION_KEY = 'constrak_auth_user';
-const USERS_KEY   = 'constrak_auth_users';
+const SESSION_KEY    = 'constrak_auth_user';
+const USERS_KEY      = 'constrak_auth_users';
+const SYS_USERS_KEY  = 'constrak_system_users';
 
 // ─── Pre-seeded demo accounts ─────────────────────────────────────────────────
 const SEED_USERS = [
@@ -22,15 +23,23 @@ function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function getAllUsers() {
   try {
     const extra = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    return [...SEED_USERS, ...extra];
+    // Extras take precedence (supports password-reset overrides for seed users)
+    const extraUids = new Set(extra.map(u => u.uid));
+    const seeds = SEED_USERS.filter(s => !extraUids.has(s.uid));
+    return [...seeds, ...extra];
   } catch {
     return [...SEED_USERS];
   }
 }
 
 function registerUser(user) {
-  const extra = getAllUsers().filter((u) => !SEED_USERS.find((s) => s.uid === u.uid));
-  localStorage.setItem(USERS_KEY, JSON.stringify([...extra, user]));
+  try {
+    const extra = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const filtered = extra.filter(u => u.uid !== user.uid);
+    localStorage.setItem(USERS_KEY, JSON.stringify([...filtered, user]));
+  } catch {
+    localStorage.setItem(USERS_KEY, JSON.stringify([user]));
+  }
 }
 
 function persistSession(user) {
@@ -63,6 +72,18 @@ export function AuthProvider({ children }) {
     const found = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
     if (!found)               throw { code: 'auth/user-not-found' };
     if (found.password !== password) throw { code: 'auth/wrong-password' };
+
+    // Block login if user status is inactive in system users
+    try {
+      const sysData = JSON.parse(localStorage.getItem(SYS_USERS_KEY) || '[]');
+      const sysUser = sysData.find(su =>
+        su.id === found.uid || su.email?.toLowerCase() === found.email?.toLowerCase()
+      );
+      if (sysUser?.status === 'inactive') throw { code: 'auth/user-disabled' };
+    } catch (e) {
+      if (e?.code) throw e;
+    }
+
     setUser(persistSession({ ...found, provider: 'email' }));
   }
 
@@ -93,6 +114,21 @@ export function AuthProvider({ children }) {
     }));
   }
 
+  // Called by admin to reset any user's password (without knowing the old one)
+  function resetPassword(uid, newPassword) {
+    if (!newPassword || newPassword.length < 6) throw { code: 'auth/weak-password' };
+    const target = getAllUsers().find(u => u.uid === uid);
+    if (!target) throw { code: 'auth/user-not-found' };
+    // Upsert into extras so the override takes effect (prioritised over seed default)
+    try {
+      const extra = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+      const filtered = extra.filter(u => u.uid !== uid);
+      localStorage.setItem(USERS_KEY, JSON.stringify([...filtered, { ...target, password: newPassword }]));
+    } catch {
+      throw { code: 'auth/internal-error' };
+    }
+  }
+
   // Called by admin panel to create a user account without logging in as them
   function addAuthUser(email, password, displayName) {
     const users = getAllUsers();
@@ -110,7 +146,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, authLoading, login, register, loginWithGoogle, loginWithFacebook, logout, addAuthUser }}>
+    <AuthContext.Provider value={{ user, authLoading, login, register, loginWithGoogle, loginWithFacebook, logout, addAuthUser, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );
@@ -133,8 +169,10 @@ export function firebaseErrorToHebrew(code) {
     'auth/weak-password':        'הסיסמה חלשה מדי — לפחות 6 תווים',
     'auth/too-many-requests':    'יותר מדי ניסיונות. נסה שוב מאוחר יותר',
     'auth/network-request-failed': 'שגיאת רשת — בדוק את החיבור',
+    'auth/user-disabled':        'חשבון זה חסום — פנה למנהל המערכת',
     'auth/popup-closed-by-user': '',
     'auth/cancelled-popup-request': '',
+    'auth/internal-error':       'שגיאה פנימית — נסה שוב',
   };
   return map[code] ?? 'שגיאה בהתחברות — נסה שוב';
 }

@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useRoles, ROLES } from '../context/RolesContext';
 
 const ALL_NAV = [
-  { id: 'dashboard', label: 'לוח בקרה',        icon: '🏠', permission: 'viewDashboard' },
-  { id: 'projects',  label: 'פרויקטים',         icon: '🏗️', permission: 'viewProjects'  },
-  { id: 'tasks',     label: 'משימות',            icon: '✅', permission: 'viewTasks'     },
-  { id: 'workers',   label: 'עובדים',            icon: '👷', permission: 'viewWorkers'   },
-  { id: 'materials', label: 'חומרים',            icon: '📦', permission: 'viewMaterials' },
-  { id: 'worklog',   label: 'יומן עבודה יומי',  icon: '📋', permission: 'viewWorkLog'   },
+  { id: 'dashboard', label: 'לוח בקרה',        icon: '🏠', permission: 'viewDashboard'  },
+  { id: 'projects',  label: 'פרויקטים',         icon: '🏗️', permission: 'viewProjects'   },
+  { id: 'tasks',     label: 'משימות',            icon: '✅', permission: 'viewTasks'      },
+  { id: 'workers',   label: 'עובדים',            icon: '👷', permission: 'viewWorkers'    },
+  { id: 'materials', label: 'חומרים',            icon: '📦', permission: 'viewMaterials'  },
+  { id: 'worklog',   label: 'יומן עבודה יומי',  icon: '📋', permission: 'viewWorkLog'    },
+  { id: 'messages',  label: 'הודעות',            icon: '💬', permission: 'sendMessage'    },
   { id: 'admin',     label: 'ניהול משתמשים',    icon: '⚙️', permission: 'viewAdminPanel' },
 ];
 

@@ -15,6 +15,7 @@ import WorkLog from './pages/WorkLog';
 import AdminPanel from './pages/AdminPanel';
 import CheckIn from './pages/CheckIn';
 import MyReport from './pages/MyReport';
+import Messages from './pages/Messages';
 import './index.css';
 
 const FULL_PAGES = {
@@ -24,6 +25,7 @@ const FULL_PAGES = {
   workers:   Workers,
   materials: Materials,
   worklog:   WorkLog,
+  messages:  Messages,
   admin:     AdminPanel,
 };
 

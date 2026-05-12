@@ -15,15 +15,16 @@ export const ROLES = {
 
 // ─── Permissions matrix ───────────────────────────────────────────────────────
 export const PERMISSIONS = [
-  { key: 'viewDashboard',  label: 'לוח בקרה',       admin: 'מלא',   pm: 'מוגבל',    sm: 'האתר שלו', sub: false,       worker: false },
-  { key: 'viewProjects',   label: 'פרויקטים',        admin: 'הכל',   pm: 'מוקצים',   sm: 'אחד',      sub: false,       worker: false },
-  { key: 'viewTasks',      label: 'משימות',           admin: true,    pm: true,       sm: true,       sub: false,       worker: false },
-  { key: 'viewWorkers',    label: 'עובדים',           admin: true,    pm: true,       sm: true,       sub: false,       worker: false },
-  { key: 'viewMaterials',  label: 'חומרים',           admin: true,    pm: true,       sm: false,      sub: false,       worker: false },
-  { key: 'viewWorkLog',    label: 'יומן עבודה',       admin: 'הכל',   pm: true,       sm: true,       sub: 'שלהם',      worker: false },
-  { key: 'submitReport',   label: 'הגשת דוח',         admin: true,    pm: false,      sm: false,      sub: true,        worker: false },
-  { key: 'checkIn',        label: "צ'ק-אין",          admin: false,   pm: false,      sm: false,      sub: false,       worker: true },
-  { key: 'manageUsers',    label: 'ניהול משתמשים',   admin: true,    pm: false,      sm: false,      sub: false,       worker: false },
+  { key: 'viewDashboard',  label: 'לוח בקרה',        admin: 'מלא',    pm: 'מוגבל',    sm: 'האתר שלו', sub: false,    worker: false    },
+  { key: 'viewProjects',   label: 'פרויקטים',         admin: 'הכל',    pm: 'מוקצים',   sm: 'אחד',      sub: false,    worker: false    },
+  { key: 'viewTasks',      label: 'משימות',            admin: true,     pm: true,       sm: true,       sub: false,    worker: 'מוקצות' },
+  { key: 'viewWorkers',    label: 'עובדים',            admin: true,     pm: true,       sm: true,       sub: false,    worker: false    },
+  { key: 'viewMaterials',  label: 'חומרים',            admin: true,     pm: true,       sm: false,      sub: false,    worker: false    },
+  { key: 'viewWorkLog',    label: 'יומן עבודה',        admin: 'הכל',    pm: true,       sm: true,       sub: 'שלהם',   worker: false    },
+  { key: 'viewMessages',   label: 'הודעות',            admin: true,     pm: true,       sm: true,       sub: true,     worker: true     },
+  { key: 'submitReport',   label: 'הגשת דוח יומי',    admin: false,    pm: false,      sm: false,      sub: true,     worker: true     },
+  { key: 'checkIn',        label: "כניסה/יציאה מאתר", admin: false,    pm: false,      sm: false,      sub: false,    worker: true     },
+  { key: 'manageUsers',    label: 'ניהול משתמשים',    admin: true,     pm: false,      sm: false,      sub: false,    worker: false    },
 ];
 
 // ─── Seed users ───────────────────────────────────────────────────────────────
@@ -95,18 +96,34 @@ export function RolesProvider({ children }) {
   const { user } = useAuth();
   const [systemUsers, setSystemUsers] = useState(() => loadSystemUsers());
 
-  // Ensure the currently-logged-in user always has a system profile.
-  // This covers users who registered before this fix (their auth entry exists
-  // in constrak_auth_users but they have no system-users row yet).
+  // On every login/logout: rescan constrak_auth_users so ALL self-registered users
+  // appear immediately in the admin panel (not just the currently logged-in one).
   useEffect(() => {
-    if (!user) return;
     setSystemUsers(prev => {
-      const found =
-        prev.find(u => u.id === user.uid) ||
-        prev.find(u => u.email?.toLowerCase() === user.email?.toLowerCase());
-      if (found) return prev; // already tracked — no change needed
-      const entry = defaultSystemEntry(user);
-      const updated = [...prev, entry];
+      const authExtras = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '[]');
+      const existingIds    = new Set(prev.map(u => u.id));
+      const existingEmails = new Set(prev.map(u => u.email?.toLowerCase()).filter(Boolean));
+
+      const toAdd = [];
+      for (const au of authExtras) {
+        if (!existingIds.has(au.uid) && !existingEmails.has(au.email?.toLowerCase())) {
+          toAdd.push(defaultSystemEntry(au));
+        }
+      }
+
+      // Also ensure the current user has a system profile
+      if (user) {
+        const alreadyTracked =
+          existingIds.has(user.uid) ||
+          existingEmails.has(user.email?.toLowerCase()) ||
+          toAdd.find(u => u.id === user.uid);
+        if (!alreadyTracked) {
+          toAdd.push(defaultSystemEntry(user));
+        }
+      }
+
+      if (toAdd.length === 0) return prev;
+      const updated = [...prev, ...toAdd];
       saveSystemUsers(updated);
       return updated;
     });
@@ -133,7 +150,10 @@ export function RolesProvider({ children }) {
     viewWorkers:    ['admin','project_manager','site_manager'].includes(currentRole),
     viewMaterials:  ['admin','project_manager'].includes(currentRole),
     viewWorkLog:    ['admin','project_manager','site_manager'].includes(currentRole),
+    viewMessages:   true,  // everyone sees messages addressed to them
+    sendMessage:    ['admin','project_manager','site_manager'].includes(currentRole),
     submitReport:   currentRole === 'subcontractor',
+    workerReport:   currentRole === 'worker',
     checkIn:        currentRole === 'worker',
     viewAdminPanel: currentRole === 'admin',
     manageUsers:    currentRole === 'admin',

@@ -22,11 +22,12 @@ const SITES_MOCK = [
 
 export default function AdminPanel() {
   const { systemUsers, createSystemUser, updateSystemUser, deleteSystemUser, toggleStatus, currentSystemUser } = useRoles();
-  const { addAuthUser } = useAuth();
+  const { addAuthUser, resetPassword } = useAuth();
   const [activeTab, setActiveTab] = useState('users');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [modalUser, setModalUser] = useState(null); // null | 'new' | user object
+  const [resetUser, setResetUser] = useState(null); // user to reset password for
   const [toast, setToast] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -84,6 +85,28 @@ export default function AdminPanel() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Reset password modal */}
+      {resetUser && (
+        <ResetPasswordModal
+          user={resetUser}
+          onClose={() => setResetUser(null)}
+          onSave={(newPassword) => {
+            try {
+              resetPassword(resetUser.id, newPassword);
+              showToast('הסיסמה אופסה בהצלחה ✓');
+            } catch (err) {
+              showToast(
+                err.code === 'auth/weak-password' ? 'הסיסמה חלשה מדי — לפחות 6 תווים' :
+                err.code === 'auth/user-not-found' ? 'משתמש לא נמצא' : 'שגיאה באיפוס סיסמה',
+                true
+              );
+              return;
+            }
+            setResetUser(null);
+          }}
+        />
       )}
 
       {/* User modal */}
@@ -265,6 +288,7 @@ export default function AdminPanel() {
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <ActionBtn icon="✏️" title="ערוך" onClick={() => setModalUser(u)} />
+                          <ActionBtn icon="🔑" title="איפוס סיסמה" onClick={() => setResetUser(u)} />
                           {!isMe && <ActionBtn icon="🗑️" title="מחק" danger onClick={() => handleDelete(u)} />}
                         </div>
                       </td>
@@ -510,6 +534,92 @@ function MField({ label, error, children, style }) {
       <label style={labelStyle}>{label}</label>
       {children}
       {error && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#ef4444' }}>{error}</p>}
+    </div>
+  );
+}
+
+// ─── Reset-password modal ─────────────────────────────────────────────────────
+function ResetPasswordModal({ user, onClose, onSave }) {
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (newPwd.length < 6) { setError('סיסמה חייבת לפחות 6 תווים'); return; }
+    if (newPwd !== confirmPwd) { setError('הסיסמאות אינן תואמות'); return; }
+    onSave(newPwd);
+  }
+
+  const eyeBtn = (show, toggle) => (
+    <button
+      type="button"
+      onClick={toggle}
+      style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#94a3b8', padding: 0 }}
+    >
+      {show ? '🙈' : '👁️'}
+    </button>
+  );
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: 'white', borderRadius: 20, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#1e293b' }}>🔑 איפוס סיסמה</h2>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#94a3b8' }}>{user.displayName} · {user.email}</p>
+          </div>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: '#f1f5f9', cursor: 'pointer', fontSize: 16 }}>×</button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ padding: 24 }}>
+          <p style={{ margin: '0 0 18px', fontSize: 13, color: '#64748b', background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: '1px solid #e2e8f0' }}>
+            הזן סיסמה חדשה. הסיסמה הנוכחית לא מוצגת ולא נדרשת.
+          </p>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>סיסמה חדשה</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showNew ? 'text' : 'password'}
+                value={newPwd}
+                onChange={e => { setNewPwd(e.target.value); setError(''); }}
+                placeholder="לפחות 6 תווים"
+                style={{ ...inputStyle(false), paddingLeft: 36 }}
+                autoFocus
+              />
+              {eyeBtn(showNew, () => setShowNew(v => !v))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 18 }}>
+            <label style={labelStyle}>אימות סיסמה</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                value={confirmPwd}
+                onChange={e => { setConfirmPwd(e.target.value); setError(''); }}
+                placeholder="הזן שוב את הסיסמה החדשה"
+                style={{ ...inputStyle(!!error && confirmPwd !== newPwd), paddingLeft: 36 }}
+              />
+              {eyeBtn(showConfirm, () => setShowConfirm(v => !v))}
+            </div>
+          </div>
+
+          {error && <p style={{ margin: '-10px 0 14px', fontSize: 12, color: '#ef4444' }}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button type="button" onClick={onClose} style={{ padding: '10px 22px', borderRadius: 10, border: '1px solid #e2e8f0', background: 'transparent', color: '#374151', fontSize: 14, cursor: 'pointer' }}>
+              ביטול
+            </button>
+            <button type="submit" style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(245,158,11,0.4)' }}>
+              אפס סיסמה
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -82,7 +82,7 @@ export default function Messages() {
           </TabBtn>
           <TabBtn active={tab === 'sent'} onClick={() => setTab('sent')}>📤 נשלח</TabBtn>
         </div>
-        {can.sendBroadcast || can.sendNotification ? (
+        {can.sendMessage ? (
           <button
             onClick={() => setComposing(true)}
             style={{ marginRight: 'auto', padding: '8px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #4fb8e0, #80cded)', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 8px rgba(79,184,224,0.4)' }}
