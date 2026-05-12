@@ -76,10 +76,10 @@ export default function Chat() {
   }
 
   // ── Send message ─────────────────────────────────────────────────────────────
-  function sendMessage(body) {
-    if (!body.trim() || !activeRoom) return;
+  function sendMessage(body, attachments) {
+    if ((!body.trim() && !attachments?.length) || !activeRoom) return;
     const data = loadChatData();
-    addChatMessage(data, activeRoom, {
+    const msg = {
       id: `cm-${Date.now()}`,
       roomId: activeRoom,
       fromId: uid,
@@ -87,7 +87,9 @@ export default function Chat() {
       fromRole: currentRole,
       body: body.trim(),
       sentAt: new Date().toISOString(),
-    });
+    };
+    if (attachments?.length) msg.attachments = attachments;
+    addChatMessage(data, activeRoom, msg);
     markChatRead(data, activeRoom, uid);
     saveChatData(data);
     setChatData(loadChatData());
@@ -516,19 +518,58 @@ function NewDMModal({ systemUsers, uid, onClose, onSelect }) {
 }
 
 // ── MessageThread ─────────────────────────────────────────────────────────────
+const MAX_ATT_SIZE  = 8 * 1024 * 1024;   // 8 MB per file
+const MAX_ATT_COUNT = 5;
+
 function MessageThread({ room, messages, uid, displayName, currentRole, onSend }) {
-  const [body,    setBody]    = useState('');
-  const bottomRef = useRef(null);
-  const textRef   = useRef(null);
+  const [body,        setBody]        = useState('');
+  const [attachments, setAttachments] = useState([]);
+  const [attError,    setAttError]    = useState('');
+  const bottomRef  = useRef(null);
+  const textRef    = useRef(null);
+  const imgRef     = useRef(null);
+  const fileRef    = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
+  // Clear attachments and reset textarea when room changes
+  useEffect(() => { setAttachments([]); setBody(''); }, [room.id]);
+
+  async function handleFilePick(e, isImage) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (!files.length) return;
+    if (attachments.length + files.length > MAX_ATT_COUNT) {
+      setAttError(`ניתן לצרף עד ${MAX_ATT_COUNT} קבצים בהודעה`);
+      setTimeout(() => setAttError(''), 3000);
+      return;
+    }
+    const tooBig = files.filter(f => f.size > MAX_ATT_SIZE);
+    if (tooBig.length) {
+      setAttError(`${tooBig[0].name} — הקובץ גדול מ-8MB`);
+      setTimeout(() => setAttError(''), 3000);
+      return;
+    }
+    const newAtts = await Promise.all(files.map(async f => ({
+      id:        `att-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name:      f.name,
+      mimeType:  f.type,
+      sizeBytes: f.size,
+      dataUrl:   await readFileAsDataUrl(f),
+      isImage:   isImage || f.type.startsWith('image/'),
+    })));
+    setAttachments(prev => [...prev, ...newAtts]);
+  }
+
+  function removeAttachment(id) { setAttachments(prev => prev.filter(a => a.id !== id)); }
+
   function handleSend() {
-    if (!body.trim()) return;
-    onSend(body);
+    if (!body.trim() && !attachments.length) return;
+    onSend(body, attachments);
     setBody('');
+    setAttachments([]);
     if (textRef.current) { textRef.current.style.height = 'auto'; textRef.current.focus(); }
   }
 
@@ -536,34 +577,34 @@ function MessageThread({ room, messages, uid, displayName, currentRole, onSend }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
-  const grouped = groupByDate(messages);
+  const canSend    = body.trim().length > 0 || attachments.length > 0;
+  const grouped    = groupByDate(messages);
+  const memberCount = room.participants?.length;
 
   const roomTitle = room.type === 'direct'
     ? Object.entries(room.names ?? {}).find(([id]) => id !== uid)?.[1] ?? room.name
     : room.name;
 
-  const subtitle = room.type === 'project' ? 'קבוצת פרויקט' : room.type === 'group' ? 'קבוצה פנימית' : 'הודעה ישירה';
-  const headerIcon = room.type === 'direct' ? (roomTitle || '?').slice(0, 2) : room.type === 'group' ? '👥' : '🏗️';
+  const subtitle    = room.type === 'project' ? 'קבוצת פרויקט' : room.type === 'group' ? 'קבוצה פנימית' : 'הודעה ישירה';
+  const headerIcon  = room.type === 'direct' ? (roomTitle || '?').slice(0, 2) : room.type === 'group' ? '👥' : '🏗️';
   const headerRadius = room.type === 'direct' ? '50%' : 10;
-  const headerFontSize = room.type === 'direct' ? 13 : 20;
-
-  const memberCount = room.participants?.length;
 
   return (
     <>
+      {/* Room header */}
       <div style={{ padding: '13px 20px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-        <div style={{ width: 38, height: 38, borderRadius: headerRadius, background: 'linear-gradient(135deg, #4fb8e0, #80cded)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: headerFontSize, flexShrink: 0 }}>
+        <div style={{ width: 38, height: 38, borderRadius: headerRadius, background: 'linear-gradient(135deg, #4fb8e0, #80cded)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: room.type === 'direct' ? 13 : 20, flexShrink: 0 }}>
           {headerIcon}
         </div>
         <div>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{roomTitle}</p>
           <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>
-            {subtitle}
-            {memberCount > 0 && room.type !== 'direct' && ` · ${memberCount} חברים`}
+            {subtitle}{memberCount > 0 && room.type !== 'direct' && ` · ${memberCount} חברים`}
           </p>
         </div>
       </div>
 
+      {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column' }}>
         {grouped.length === 0 && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#94a3b8' }}>
@@ -579,70 +620,186 @@ function MessageThread({ room, messages, uid, displayName, currentRole, onSend }
               <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
             </div>
             {msgs.map((msg, i) => (
-              <MessageBubble
-                key={msg.id}
-                msg={msg}
-                isMine={msg.fromId === uid}
-                sameAuthor={i > 0 && msgs[i - 1].fromId === msg.fromId}
-              />
+              <MessageBubble key={msg.id} msg={msg} isMine={msg.fromId === uid} sameAuthor={i > 0 && msgs[i - 1].fromId === msg.fromId} />
             ))}
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ padding: '10px 16px', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
-        <div style={{ flex: 1, background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0', padding: '8px 14px', display: 'flex' }}>
-          <textarea
-            ref={textRef}
-            value={body}
-            onChange={e => {
-              setBody(e.target.value);
-              e.target.style.height = 'auto';
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="כתוב הודעה..."
-            rows={1}
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', resize: 'none', fontSize: 14, color: '#0f172a', fontFamily: 'inherit', lineHeight: 1.5, minHeight: 22, maxHeight: 120, overflow: 'hidden', direction: 'rtl' }}
-          />
+      {/* Input area */}
+      <div style={{ background: 'white', borderTop: '1px solid #e2e8f0', flexShrink: 0 }}>
+
+        {/* Attachment error toast */}
+        {attError && (
+          <div style={{ padding: '6px 16px', background: '#fef2f2', borderBottom: '1px solid #fecaca', fontSize: 12, color: '#dc2626', direction: 'rtl' }}>
+            ⚠️ {attError}
+          </div>
+        )}
+
+        {/* Pending attachments preview */}
+        {attachments.length > 0 && (
+          <div style={{ padding: '10px 14px 6px', display: 'flex', gap: 8, flexWrap: 'wrap', borderBottom: '1px solid #f1f5f9', direction: 'rtl' }}>
+            {attachments.map(att => att.isImage ? (
+              <div key={att.id} style={{ position: 'relative', flexShrink: 0 }}>
+                <img src={att.dataUrl} alt={att.name} style={{ width: 68, height: 68, objectFit: 'cover', borderRadius: 9, border: '1px solid #e2e8f0', display: 'block' }} />
+                <button onClick={() => removeAttachment(att.id)} style={{ position: 'absolute', top: -5, left: -5, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: 'white', border: '2px solid white', cursor: 'pointer', fontSize: 11, fontWeight: 700, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>×</button>
+              </div>
+            ) : (
+              <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', background: '#f8fafc', borderRadius: 9, border: '1px solid #e2e8f0', maxWidth: 180, flexShrink: 0 }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{fileIcon(att.mimeType, att.name)}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</p>
+                  <p style={{ margin: 0, fontSize: 10, color: '#94a3b8' }}>{fmtSize(att.sizeBytes)}</p>
+                </div>
+                <button onClick={() => removeAttachment(att.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Text + buttons row */}
+        <div style={{ padding: '10px 14px', display: 'flex', gap: 9, alignItems: 'flex-end' }}>
+          {/* Hidden file inputs */}
+          <input ref={imgRef}  type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple style={{ display: 'none' }} onChange={e => handleFilePick(e, true)}  />
+          <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"                multiple style={{ display: 'none' }} onChange={e => handleFilePick(e, false)} />
+
+          {/* Textarea box (contains attach icons on right side) */}
+          <div style={{ flex: 1, background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0', padding: '7px 10px 7px 10px', display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+            {/* Attach icons — right side (RTL start) */}
+            <div style={{ display: 'flex', gap: 2, flexShrink: 0, paddingBottom: 1 }}>
+              <AttachIconBtn icon="🖼️" title="הוסף תמונה" onClick={() => imgRef.current?.click()} active={attachments.some(a => a.isImage)} />
+              <AttachIconBtn icon="📎" title="הוסף קובץ"  onClick={() => fileRef.current?.click()} active={attachments.some(a => !a.isImage)} />
+            </div>
+            <textarea
+              ref={textRef}
+              value={body}
+              onChange={e => {
+                setBody(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="כתוב הודעה..."
+              rows={1}
+              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', resize: 'none', fontSize: 14, color: '#0f172a', fontFamily: 'inherit', lineHeight: 1.5, minHeight: 22, maxHeight: 120, overflow: 'hidden', direction: 'rtl' }}
+            />
+          </div>
+
+          {/* Send button */}
+          <button
+            onClick={handleSend}
+            disabled={!canSend}
+            style={{ width: 42, height: 42, borderRadius: 12, border: 'none', cursor: canSend ? 'pointer' : 'default', background: canSend ? 'linear-gradient(135deg, #4fb8e0, #80cded)' : '#e2e8f0', color: canSend ? 'white' : '#94a3b8', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s', flexShrink: 0 }}
+            title="שלח (Enter)"
+          >
+            ⬆
+          </button>
         </div>
-        <button
-          onClick={handleSend}
-          disabled={!body.trim()}
-          style={{ width: 42, height: 42, borderRadius: 12, border: 'none', cursor: body.trim() ? 'pointer' : 'default', background: body.trim() ? 'linear-gradient(135deg, #4fb8e0, #80cded)' : '#e2e8f0', color: body.trim() ? 'white' : '#94a3b8', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s', flexShrink: 0 }}
-          title="שלח (Enter)"
-        >
-          ⬆
-        </button>
       </div>
     </>
   );
 }
 
+// ── AttachIconBtn ─────────────────────────────────────────────────────────────
+function AttachIconBtn({ icon, title, onClick, active }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: active ? '#dbeafe' : hov ? '#f1f5f9' : 'transparent', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s', padding: 0, flexShrink: 0 }}
+    >
+      {icon}
+    </button>
+  );
+}
+
 // ── MessageBubble ─────────────────────────────────────────────────────────────
 function MessageBubble({ msg, isMine, sameAuthor }) {
-  const initials = (msg.fromName || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const initials    = (msg.fromName || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const imageAtts   = msg.attachments?.filter(a => a.isImage)  ?? [];
+  const fileAtts    = msg.attachments?.filter(a => !a.isImage) ?? [];
+  const hasBody     = msg.body?.length > 0;
+  const hasAtts     = imageAtts.length > 0 || fileAtts.length > 0;
+
+  // Bubble background / color depending on type
+  const bubbleBg    = isMine ? 'linear-gradient(135deg, #4fb8e0, #80cded)' : 'white';
+  const bubbleColor = isMine ? 'white' : '#0f172a';
+  const borderStyle = isMine ? '16px 4px 16px 16px' : '4px 16px 16px 16px';
+
   return (
     <div style={{ display: 'flex', direction: 'ltr', justifyContent: isMine ? 'flex-end' : 'flex-start', marginTop: sameAuthor ? 2 : 10, alignItems: 'flex-end', gap: 7 }}>
+      {/* Left-side avatar (other's messages) */}
       {!isMine && (
         sameAuthor
           ? <div style={{ width: 30, flexShrink: 0 }} />
           : <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{initials}</div>
       )}
-      <div style={{ maxWidth: '64%' }}>
+
+      <div style={{ maxWidth: '68%' }}>
         {!sameAuthor && !isMine && (
           <p style={{ margin: '0 2px 3px', fontSize: 11, color: '#94a3b8', fontWeight: 600, direction: 'rtl' }}>
             {ROLE_ICONS[msg.fromRole]} {msg.fromName}
           </p>
         )}
-        <div style={{ padding: '8px 13px', borderRadius: isMine ? '16px 4px 16px 16px' : '4px 16px 16px 16px', background: isMine ? 'linear-gradient(135deg, #4fb8e0, #80cded)' : 'white', color: isMine ? 'white' : '#0f172a', fontSize: 14, lineHeight: 1.55, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', direction: 'rtl' }}>
-          {msg.body}
-        </div>
+
+        {/* Image grid — outside the bubble */}
+        {imageAtts.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: hasBody || fileAtts.length ? 4 : 0, justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
+            {imageAtts.map((att, i) => (
+              <a key={att.id ?? i} href={att.dataUrl} target="_blank" rel="noreferrer" style={{ display: 'block', flexShrink: 0 }}>
+                <img
+                  src={att.dataUrl}
+                  alt={att.name}
+                  style={{
+                    width:  imageAtts.length === 1 ? 220 : 130,
+                    height: imageAtts.length === 1 ? 180 : 110,
+                    objectFit: 'cover',
+                    borderRadius: 10,
+                    display: 'block',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.14)',
+                    cursor: 'zoom-in',
+                  }}
+                />
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* Text + file attachments bubble (only if there's content) */}
+        {(hasBody || fileAtts.length > 0) && (
+          <div style={{ padding: '8px 13px', borderRadius: borderStyle, background: bubbleBg, color: bubbleColor, fontSize: 14, lineHeight: 1.55, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', direction: 'rtl' }}>
+            {hasBody && (
+              <p style={{ margin: fileAtts.length ? '0 0 8px' : 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.body}</p>
+            )}
+            {/* File attachment cards */}
+            {fileAtts.map((att, i) => (
+              <a
+                key={att.id ?? i}
+                href={att.dataUrl}
+                download={att.name}
+                style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 9, background: isMine ? 'rgba(255,255,255,0.18)' : '#f8fafc', border: `1px solid ${isMine ? 'rgba(255,255,255,0.25)' : '#e2e8f0'}`, textDecoration: 'none', color: 'inherit', marginTop: i > 0 ? 6 : 0, cursor: 'pointer' }}
+              >
+                <span style={{ fontSize: 24, flexShrink: 0 }}>{fileIcon(att.mimeType, att.name)}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</p>
+                  <p style={{ margin: 0, fontSize: 10, opacity: 0.72 }}>{fmtSize(att.sizeBytes)}</p>
+                </div>
+                <span style={{ fontSize: 14, opacity: 0.7, flexShrink: 0 }}>⬇</span>
+              </a>
+            ))}
+          </div>
+        )}
+
         <p style={{ margin: '3px 2px 0', fontSize: 10, color: '#94a3b8', textAlign: isMine ? 'right' : 'left', direction: 'ltr' }}>
           {fmtTime(msg.sentAt)}
         </p>
       </div>
+
+      {/* Right-side avatar (own messages) */}
       {isMine && (
         sameAuthor
           ? <div style={{ width: 30, flexShrink: 0 }} />
@@ -650,6 +807,31 @@ function MessageBubble({ msg, isMine, sameAuthor }) {
       )}
     </div>
   );
+}
+
+// ── Attachment helpers ────────────────────────────────────────────────────────
+function readFileAsDataUrl(file) {
+  return new Promise(resolve => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.readAsDataURL(file);
+  });
+}
+
+function fileIcon(mimeType, name) {
+  if (!mimeType && !name) return '📎';
+  if (mimeType?.startsWith('image/'))                                         return '🖼️';
+  if (mimeType === 'application/pdf'     || name?.toLowerCase().endsWith('.pdf'))  return '📕';
+  if (mimeType?.includes('word')         || name?.match(/\.docx?$/i))              return '📘';
+  if (mimeType?.includes('excel') || mimeType?.includes('spreadsheet') || name?.match(/\.xlsx?$/i)) return '📗';
+  return '📎';
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024)           return `${bytes} B`;
+  if (bytes < 1024 * 1024)    return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
