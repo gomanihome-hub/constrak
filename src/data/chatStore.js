@@ -38,6 +38,15 @@ export function saveChatData(data) {
   window.dispatchEvent(new Event('constrak:chat'));
 }
 
+export function createGroupRoom(data, { name, type, projectId, creatorId, participants }) {
+  const id = `room-${type}-${Date.now()}`;
+  const room = { id, type, name, participants, createdBy: creatorId, createdAt: new Date().toISOString() };
+  if (projectId) room.projectId = projectId;
+  data.rooms[id] = room;
+  data.messages[id] = [];
+  return id;
+}
+
 export function ensureProjectRoom(data, projectId, projectName) {
   const id = `room-project-${projectId}`;
   if (!data.rooms[id]) {
