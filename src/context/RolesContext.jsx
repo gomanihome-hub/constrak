@@ -158,6 +158,7 @@ export function RolesProvider({ children }) {
     checkIn:        currentRole === 'worker',
     viewAdminPanel: currentRole === 'admin',
     manageUsers:    currentRole === 'admin',
+    viewSafety:     ['admin','project_manager','site_manager'].includes(currentRole),
   }), [currentRole]);
 
   // Returns null (= all) for admin, otherwise the list of project ID strings

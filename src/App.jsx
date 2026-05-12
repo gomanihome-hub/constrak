@@ -18,6 +18,7 @@ import MyReport from './pages/MyReport';
 import Messages from './pages/Messages';
 import Megaphone from './pages/Megaphone';
 import Chat from './pages/Chat';
+import Safety from './pages/Safety';
 import './index.css';
 
 const FULL_PAGES = {
@@ -30,6 +31,7 @@ const FULL_PAGES = {
   messages:  Messages,
   megaphone: Megaphone,
   chat:      Chat,
+  safety:    Safety,
   admin:     AdminPanel,
 };
 
