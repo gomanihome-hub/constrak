@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRoles, ROLES } from '../context/RolesContext';
+import { getTotalUnreadForUser } from '../data/chatStore';
 
 const ALL_NAV = [
   { id: 'dashboard', label: 'לוח בקרה',        icon: '🏠', permission: 'viewDashboard'  },
@@ -10,12 +11,23 @@ const ALL_NAV = [
   { id: 'worklog',   label: 'יומן עבודה יומי',  icon: '📋', permission: 'viewWorkLog'    },
   { id: 'messages',  label: 'הודעות',            icon: '💬', permission: 'sendMessage'    },
   { id: 'megaphone', label: 'מגפון',             icon: '📢', permission: 'sendBroadcast'  },
+  { id: 'chat',      label: "צ'אט",              icon: '🗨️', permission: 'viewMessages'   },
   { id: 'admin',     label: 'ניהול משתמשים',    icon: '⚙️', permission: 'viewAdminPanel' },
 ];
 
 export default function Sidebar({ activePage, setActivePage }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed,    setCollapsed]    = useState(false);
+  const [chatUnread,   setChatUnread]   = useState(0);
   const { can, currentSystemUser, currentRole } = useRoles();
+
+  useEffect(() => {
+    const uid = currentSystemUser?.id;
+    if (!uid) return;
+    function refresh() { setChatUnread(getTotalUnreadForUser(uid)); }
+    refresh();
+    window.addEventListener('constrak:chat', refresh);
+    return () => window.removeEventListener('constrak:chat', refresh);
+  }, [currentSystemUser?.id]);
 
   const visibleItems = ALL_NAV.filter(item => can[item.permission]);
   const roleInfo = ROLES[currentRole];
@@ -40,20 +52,34 @@ export default function Sidebar({ activePage, setActivePage }) {
 
       {/* Nav */}
       <nav className="flex-1 py-4">
-        {visibleItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActivePage(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 text-right transition-colors ${
-              activePage === item.id
-                ? 'bg-orange-500 text-white'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <span className="text-xl flex-shrink-0">{item.icon}</span>
-            {!collapsed && <span className="font-medium">{item.label}</span>}
-          </button>
-        ))}
+        {visibleItems.map((item) => {
+          const badge = item.id === 'chat' && chatUnread > 0 ? chatUnread : null;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActivePage(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-right transition-colors ${
+                activePage === item.id
+                  ? 'bg-orange-500 text-white'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+              style={{ position: 'relative' }}
+            >
+              <span className="text-xl flex-shrink-0">{item.icon}</span>
+              {!collapsed && <span className="font-medium">{item.label}</span>}
+              {badge && (
+                <span style={{ marginRight: 'auto', background: '#4fb8e0', color: 'white', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 6px', minWidth: 18, textAlign: 'center' }}>
+                  {badge}
+                </span>
+              )}
+              {badge && collapsed && (
+                <span style={{ position: 'absolute', top: 6, left: 6, background: '#ef4444', color: 'white', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 4px', minWidth: 14, textAlign: 'center' }}>
+                  {badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
       {/* Footer with real user info */}

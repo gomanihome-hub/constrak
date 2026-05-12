@@ -1,8 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRoles } from '../context/RolesContext';
 import { loadTasks, saveTasks, PRIORITY, STATUS } from '../data/tasksStore';
 import { loadMsgs, saveMsgs, isVisibleTo, markRead, roleLabel } from '../data/messagesStore';
+import {
+  loadChatData, saveChatData, ensureProjectRoom, addChatMessage,
+  markChatRead, getUnreadCount, CHAT_PROJECTS,
+} from '../data/chatStore';
 
 // ── Worker daily-report storage ───────────────────────────────────────────────
 const REPORTS_KEY = 'constrak_worker_reports';
@@ -27,6 +31,7 @@ const TABS = [
   { id: 'tasks',    label: 'משימות',    icon: '✅' },
   { id: 'messages', label: 'הודעות',    icon: '💬' },
   { id: 'report',   label: 'דיווח יומי', icon: '📋' },
+  { id: 'chat',     label: "צ'אט",       icon: '🗨️' },
 ];
 
 export default function CheckIn() {
@@ -38,11 +43,18 @@ export default function CheckIn() {
   const [tasks,     setTasks]     = useState(() => loadTasks());
   const [msgs,      setMsgs]      = useState(() => loadMsgs());
   const [reports,   setReports]   = useState(() => loadReports());
+  const [chatData,  setChatData]  = useState(() => loadChatData());
   const [now,       setNow]       = useState(new Date());
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    function reload() { setChatData(loadChatData()); }
+    window.addEventListener('constrak:chat', reload);
+    return () => window.removeEventListener('constrak:chat', reload);
   }, []);
 
   const uid         = currentSystemUser?.id ?? user?.uid;
@@ -113,7 +125,15 @@ export default function CheckIn() {
   }
 
   // ── Badge helper ──────────────────────────────────────────────────────────
-  const badges = { tasks: pending || null, messages: unread || null };
+  const chatUnread = useMemo(() => {
+    const assignedIds = currentSystemUser?.assignedProjects ?? [];
+    return assignedIds.reduce((sum, pid) => {
+      const roomId = `room-project-${pid}`;
+      return sum + getUnreadCount(chatData, roomId, uid);
+    }, 0);
+  }, [chatData, currentSystemUser, uid]);
+
+  const badges = { tasks: pending || null, messages: unread || null, chat: chatUnread || null };
 
   const timeStr = now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dateStr = now.toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -147,6 +167,7 @@ export default function CheckIn() {
         {activeTab === 'tasks'    && <TabTasks    tasks={myTasks} onCycle={cycleTaskStatus} />}
         {activeTab === 'messages' && <TabMessages msgs={myMsgs} uid={uid} onRead={handleReadMsg} />}
         {activeTab === 'report'   && <TabReport   reports={myReports} onSubmit={submitReport} />}
+        {activeTab === 'chat'     && <TabChat     uid={uid} displayName={displayName} currentRole={currentSystemUser?.role ?? 'worker'} assignedProjects={currentSystemUser?.assignedProjects ?? []} chatData={chatData} setChatData={setChatData} />}
       </div>
 
       {/* ── Bottom nav ── */}
@@ -552,6 +573,213 @@ function TabReport({ reports, onSubmit }) {
       ) : null}
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab: צ'אט (Chat)
+// ─────────────────────────────────────────────────────────────────────────────
+const CHAT_ROLE_ICONS = { admin: '👑', project_manager: '📊', site_manager: '🦺', subcontractor: '🔨', worker: '👷' };
+
+function TabChat({ uid, displayName, currentRole, assignedProjects, chatData, setChatData }) {
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [body,       setBody]       = useState('');
+  const bottomRef = useRef(null);
+  const textRef   = useRef(null);
+
+  // Ensure project rooms exist
+  useEffect(() => {
+    const data = loadChatData();
+    let changed = false;
+    for (const pid of assignedProjects) {
+      const proj = CHAT_PROJECTS.find(p => p.id === pid);
+      if (proj && !data.rooms[`room-project-${pid}`]) {
+        ensureProjectRoom(data, pid, proj.name);
+        changed = true;
+      }
+    }
+    if (changed) { saveChatData(data); setChatData(loadChatData()); }
+  }, []); // eslint-disable-line
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeRoom, chatData]);
+
+  const myRooms = assignedProjects
+    .map(pid => chatData.rooms[`room-project-${pid}`])
+    .filter(Boolean);
+
+  const activeMessages = activeRoom ? (chatData.messages[activeRoom] ?? []) : [];
+  const activeRoomObj  = activeRoom ? chatData.rooms[activeRoom] : null;
+
+  function openRoom(roomId) {
+    setActiveRoom(roomId);
+    const data = loadChatData();
+    markChatRead(data, roomId, uid);
+    saveChatData(data);
+    setChatData(loadChatData());
+  }
+
+  function sendMsg() {
+    if (!body.trim() || !activeRoom) return;
+    const data = loadChatData();
+    addChatMessage(data, activeRoom, {
+      id: `cm-${Date.now()}`,
+      roomId: activeRoom,
+      fromId: uid,
+      fromName: displayName,
+      fromRole: currentRole,
+      body: body.trim(),
+      sentAt: new Date().toISOString(),
+    });
+    markChatRead(data, activeRoom, uid);
+    saveChatData(data);
+    setChatData(loadChatData());
+    setBody('');
+    if (textRef.current) textRef.current.style.height = 'auto';
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+  }
+
+  // Room list view
+  if (!activeRoom) {
+    return (
+      <div style={{ padding: '20px 16px', maxWidth: 480, margin: '0 auto', width: '100%' }}>
+        <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'white' }}>צ&apos;אט</h2>
+        {myRooms.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 40, color: '#475569' }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>💬</div>
+            <p style={{ margin: 0, fontSize: 14 }}>אין שיחות זמינות</p>
+          </div>
+        )}
+        {myRooms.map(room => {
+          const unread  = getUnreadCount(chatData, room.id, uid);
+          const lastMsg = (chatData.messages[room.id] ?? []).at(-1);
+          return (
+            <button
+              key={room.id}
+              onClick={() => openRoom(room.id)}
+              style={{ width: '100%', padding: '14px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, cursor: 'pointer', textAlign: 'right', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}
+            >
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #4fb8e0, #80cded)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🏗️</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <span style={{ fontSize: 14, fontWeight: unread ? 700 : 600, color: 'white' }}>{room.name}</span>
+                  {lastMsg && <span style={{ fontSize: 10, color: '#475569' }}>{new Date(lastMsg.sentAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <p style={{ margin: 0, fontSize: 12, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {lastMsg ? `${lastMsg.fromName}: ${lastMsg.body.slice(0, 40)}` : 'אין הודעות'}
+                  </p>
+                  {unread > 0 && <span style={{ background: '#4fb8e0', color: 'white', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 6px', marginRight: 6 }}>{unread}</span>}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Message thread view
+  const grouped = chatGroupByDate(activeMessages);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <button onClick={() => setActiveRoom(null)} style={{ background: 'transparent', border: 'none', color: '#4fb8e0', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg, #4fb8e0, #80cded)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏗️</div>
+        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'white' }}>{activeRoomObj?.name}</p>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column' }}>
+        {grouped.map(({ date, msgs }) => (
+          <div key={date}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '10px 0 6px', direction: 'ltr' }}>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+              <span style={{ fontSize: 10, color: '#334155', padding: '1px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: 99 }}>{chatFmtDate(date)}</span>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+            </div>
+            {msgs.map((msg, i) => {
+              const isMine     = msg.fromId === uid;
+              const sameAuthor = i > 0 && msgs[i - 1].fromId === msg.fromId;
+              const initials   = (msg.fromName || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+              return (
+                <div key={msg.id} style={{ display: 'flex', direction: 'ltr', justifyContent: isMine ? 'flex-end' : 'flex-start', marginTop: sameAuthor ? 2 : 8, alignItems: 'flex-end', gap: 6 }}>
+                  {!isMine && (sameAuthor
+                    ? <div style={{ width: 28, flexShrink: 0 }} />
+                    : <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontWeight: 700, fontSize: 10, flexShrink: 0 }}>{initials}</div>
+                  )}
+                  <div style={{ maxWidth: '72%' }}>
+                    {!sameAuthor && !isMine && <p style={{ margin: '0 2px 2px', fontSize: 10, color: '#475569', direction: 'rtl' }}>{CHAT_ROLE_ICONS[msg.fromRole]} {msg.fromName}</p>}
+                    <div style={{ padding: '7px 11px', borderRadius: isMine ? '14px 3px 14px 14px' : '3px 14px 14px 14px', background: isMine ? 'linear-gradient(135deg, #4fb8e0, #80cded)' : 'rgba(255,255,255,0.08)', color: isMine ? 'white' : '#e2e8f0', fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', direction: 'rtl' }}>
+                      {msg.body}
+                    </div>
+                    <p style={{ margin: '2px 2px 0', fontSize: 9, color: '#334155', direction: 'ltr', textAlign: isMine ? 'right' : 'left' }}>
+                      {new Date(msg.sentAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  {isMine && (sameAuthor
+                    ? <div style={{ width: 28, flexShrink: 0 }} />
+                    : <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #4fb8e0, #80cded)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 10, flexShrink: 0 }}>{initials}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        {activeMessages.length === 0 && (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155', fontSize: 13 }}>אין הודעות עדיין</div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
+        <div style={{ flex: 1, background: 'rgba(255,255,255,0.07)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', padding: '7px 12px' }}>
+          <textarea
+            ref={textRef}
+            value={body}
+            onChange={e => { setBody(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'; }}
+            onKeyDown={handleKeyDown}
+            placeholder="כתוב הודעה..."
+            rows={1}
+            style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', resize: 'none', fontSize: 13, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, minHeight: 20, maxHeight: 100, overflow: 'hidden', direction: 'rtl' }}
+          />
+        </div>
+        <button
+          onClick={sendMsg}
+          disabled={!body.trim()}
+          style={{ width: 38, height: 38, borderRadius: 10, border: 'none', cursor: body.trim() ? 'pointer' : 'default', background: body.trim() ? 'linear-gradient(135deg, #4fb8e0, #80cded)' : 'rgba(255,255,255,0.07)', color: body.trim() ? 'white' : '#334155', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+        >
+          ⬆
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function chatGroupByDate(messages) {
+  const groups = {};
+  for (const msg of messages) {
+    const d = msg.sentAt.slice(0, 10);
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(msg);
+  }
+  return Object.entries(groups)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, msgs]) => ({ date, msgs }));
+}
+
+function chatFmtDate(dateStr) {
+  const today     = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (dateStr === today)     return 'היום';
+  if (dateStr === yesterday) return 'אתמול';
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
 }
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import CheckIn from './pages/CheckIn';
 import MyReport from './pages/MyReport';
 import Messages from './pages/Messages';
 import Megaphone from './pages/Megaphone';
+import Chat from './pages/Chat';
 import './index.css';
 
 const FULL_PAGES = {
@@ -28,6 +29,7 @@ const FULL_PAGES = {
   worklog:   WorkLog,
   messages:  Messages,
   megaphone: Megaphone,
+  chat:      Chat,
   admin:     AdminPanel,
 };
 
