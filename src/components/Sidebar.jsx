@@ -1,40 +1,55 @@
 import { useState, useEffect } from 'react';
 import { useRoles, ROLES } from '../context/RolesContext';
 import { getTotalUnreadForUser } from '../data/chatStore';
+import { getUnreadAlertCount } from '../data/alertsStore';
 
 const ALL_NAV = [
-  { id: 'dashboard', label: 'לוח בקרה',        icon: '🏠', permission: 'viewDashboard'  },
-  { id: 'projects',  label: 'פרויקטים',         icon: '🏗️', permission: 'viewProjects'   },
-  { id: 'tasks',     label: 'משימות',            icon: '✅', permission: 'viewTasks'      },
-  { id: 'workers',   label: 'עובדים',            icon: '👷', permission: 'viewWorkers'    },
-  { id: 'materials', label: 'חומרים',            icon: '📦', permission: 'viewMaterials'  },
-  { id: 'worklog',   label: 'יומן עבודה יומי',  icon: '📋', permission: 'viewWorkLog'    },
-  { id: 'messages',  label: 'הודעות',            icon: '💬', permission: 'sendMessage'    },
-  { id: 'megaphone', label: 'מגפון',             icon: '📢', permission: 'sendBroadcast'  },
-  { id: 'chat',      label: "צ'אט",              icon: '🗨️', permission: 'viewMessages'   },
-  { id: 'safety',    label: 'תדרוך בטיחות',     icon: '🛡️', permission: 'viewSafety'     },
-  { id: 'documents', label: 'מסמכי פרויקט',     icon: '📁', permission: 'viewDocuments'  },
-  { id: 'admin',     label: 'ניהול משתמשים',    icon: '⚙️', permission: 'viewAdminPanel' },
+  { id: 'dashboard',     label: 'לוח בקרה',        icon: '🏠', permission: 'viewDashboard'     },
+  { id: 'projects',      label: 'פרויקטים',         icon: '🏗️', permission: 'viewProjects'      },
+  { id: 'tasks',         label: 'משימות',            icon: '✅', permission: 'viewTasks'         },
+  { id: 'workers',       label: 'עובדים',            icon: '👷', permission: 'viewWorkers'       },
+  { id: 'materials',     label: 'חומרים',            icon: '📦', permission: 'viewMaterials'     },
+  { id: 'worklog',       label: 'יומן עבודה יומי',  icon: '📋', permission: 'viewWorkLog'       },
+  { id: 'notifications', label: 'התראות',            icon: '🔔', permission: 'viewNotifications' },
+  { id: 'messages',      label: 'הודעות',            icon: '💬', permission: 'sendMessage'       },
+  { id: 'megaphone',     label: 'מגפון',             icon: '📢', permission: 'sendBroadcast'     },
+  { id: 'chat',          label: "צ'אט",              icon: '🗨️', permission: 'viewMessages'      },
+  { id: 'safety',        label: 'תדרוך בטיחות',     icon: '🛡️', permission: 'viewSafety'        },
+  { id: 'documents',     label: 'מסמכי פרויקט',     icon: '📁', permission: 'viewDocuments'     },
+  { id: 'admin',         label: 'ניהול משתמשים',    icon: '⚙️', permission: 'viewAdminPanel'    },
 ];
 
 export default function Sidebar({ activePage, setActivePage }) {
   const [collapsed,    setCollapsed]    = useState(false);
   const [chatUnread,   setChatUnread]   = useState(0);
+  const [alertUnread,  setAlertUnread]  = useState(0);
   const { can, currentSystemUser, currentRole } = useRoles();
 
+  const uid = currentSystemUser?.id;
+
   useEffect(() => {
-    const uid = currentSystemUser?.id;
     if (!uid) return;
-    function refresh() { setChatUnread(getTotalUnreadForUser(uid)); }
-    refresh();
-    window.addEventListener('constrak:chat', refresh);
-    return () => window.removeEventListener('constrak:chat', refresh);
-  }, [currentSystemUser?.id]);
+    function refreshChat()  { setChatUnread(getTotalUnreadForUser(uid)); }
+    function refreshAlerts(){ setAlertUnread(getUnreadAlertCount(uid)); }
+    refreshChat(); refreshAlerts();
+    window.addEventListener('constrak:chat',   refreshChat);
+    window.addEventListener('constrak:alerts', refreshAlerts);
+    return () => {
+      window.removeEventListener('constrak:chat',   refreshChat);
+      window.removeEventListener('constrak:alerts', refreshAlerts);
+    };
+  }, [uid]);
 
   const visibleItems = ALL_NAV.filter(item => can[item.permission]);
-  const roleInfo = ROLES[currentRole];
+  const roleInfo   = ROLES[currentRole];
   const displayName = currentSystemUser?.displayName || 'משתמש';
-  const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const initials   = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  function getBadge(item) {
+    if (item.id === 'chat'          && chatUnread  > 0) return { count: chatUnread,  color: '#4fb8e0' };
+    if (item.id === 'notifications' && alertUnread > 0) return { count: alertUnread, color: '#ef4444' };
+    return null;
+  }
 
   return (
     <aside className={`bg-slate-900 text-white flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'} min-h-screen`}>
@@ -55,7 +70,7 @@ export default function Sidebar({ activePage, setActivePage }) {
       {/* Nav */}
       <nav className="flex-1 py-4">
         {visibleItems.map((item) => {
-          const badge = item.id === 'chat' && chatUnread > 0 ? chatUnread : null;
+          const badge = getBadge(item);
           return (
             <button
               key={item.id}
@@ -69,14 +84,14 @@ export default function Sidebar({ activePage, setActivePage }) {
             >
               <span className="text-xl flex-shrink-0">{item.icon}</span>
               {!collapsed && <span className="font-medium">{item.label}</span>}
-              {badge && (
-                <span style={{ marginRight: 'auto', background: '#4fb8e0', color: 'white', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 6px', minWidth: 18, textAlign: 'center' }}>
-                  {badge}
+              {badge && !collapsed && (
+                <span style={{ marginRight: 'auto', background: badge.color, color: 'white', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 7px', minWidth: 18, textAlign: 'center' }}>
+                  {badge.count}
                 </span>
               )}
               {badge && collapsed && (
-                <span style={{ position: 'absolute', top: 6, left: 6, background: '#ef4444', color: 'white', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 4px', minWidth: 14, textAlign: 'center' }}>
-                  {badge}
+                <span style={{ position: 'absolute', top: 6, left: 6, background: badge.color, color: 'white', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 4px', minWidth: 14, textAlign: 'center' }}>
+                  {badge.count}
                 </span>
               )}
             </button>
@@ -84,7 +99,7 @@ export default function Sidebar({ activePage, setActivePage }) {
         })}
       </nav>
 
-      {/* Footer with real user info */}
+      {/* Footer – user info, click → profile */}
       {!collapsed && (
         <div className="p-4 border-t border-slate-700">
           <button

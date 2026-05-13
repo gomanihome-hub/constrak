@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useRoles } from './context/RolesContext';
+import { runAlertEngine } from './data/alertsStore';
 import SplashScreen from './components/SplashScreen';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -21,6 +22,7 @@ import Chat from './pages/Chat';
 import Safety from './pages/Safety';
 import Documents from './pages/Documents';
 import Profile from './pages/Profile';
+import Notifications from './pages/Notifications';
 import './index.css';
 
 const FULL_PAGES = {
@@ -33,9 +35,10 @@ const FULL_PAGES = {
   messages:  Messages,
   megaphone: Megaphone,
   chat:      Chat,
-  safety:    Safety,
-  documents: Documents,
-  profile:   Profile,
+  safety:        Safety,
+  documents:     Documents,
+  profile:       Profile,
+  notifications: Notifications,
   admin:     AdminPanel,
 };
 
@@ -45,6 +48,14 @@ export default function App() {
   const [splashDone, setSplashDone] = useState(false);
   const [authPage, setAuthPage] = useState('login');
   const [activePage, setActivePage] = useState('dashboard');
+
+  // Run alert engine on mount and every minute
+  useEffect(() => {
+    if (!user) return;
+    runAlertEngine();
+    const interval = setInterval(runAlertEngine, 60_000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
 

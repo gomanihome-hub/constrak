@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRoles, ROLES } from '../context/RolesContext';
+import { getUnreadAlertCount } from '../data/alertsStore';
 
 const pageTitles = {
   dashboard: 'לוח בקרה',
@@ -10,7 +11,8 @@ const pageTitles = {
   materials: 'ניהול חומרים',
   worklog:   'יומן עבודה יומי',
   admin:     'ניהול משתמשים',
-  profile:   'הפרופיל שלי',
+  profile:        'הפרופיל שלי',
+  notifications:  'מרכז התראות',
   documents: 'מסמכי פרויקט',
   chat:      "צ'אט",
   safety:    'תדרוך בטיחות',
@@ -20,9 +22,19 @@ const pageTitles = {
 
 export default function Header({ activePage, setActivePage }) {
   const { user, logout } = useAuth();
-  const { currentRole } = useRoles();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { currentRole, currentSystemUser } = useRoles();
+  const [menuOpen,    setMenuOpen]    = useState(false);
+  const [alertUnread, setAlertUnread] = useState(0);
   const menuRef = useRef(null);
+
+  useEffect(() => {
+    const uid = currentSystemUser?.id;
+    if (!uid) return;
+    function refresh() { setAlertUnread(getUnreadAlertCount(uid)); }
+    refresh();
+    window.addEventListener('constrak:alerts', refresh);
+    return () => window.removeEventListener('constrak:alerts', refresh);
+  }, [currentSystemUser?.id]);
 
   const today = new Date().toLocaleDateString('he-IL', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -55,9 +67,17 @@ export default function Header({ activePage, setActivePage }) {
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
-        <button className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
+        <button
+          onClick={() => setActivePage?.('notifications')}
+          className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+          title="התראות"
+        >
           <span className="text-xl">🔔</span>
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+          {alertUnread > 0 && (
+            <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, background: '#ef4444', color: 'white', borderRadius: 99, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+              {alertUnread > 9 ? '9+' : alertUnread}
+            </span>
+          )}
         </button>
         <button className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
           <span className="text-xl">⚙️</span>
