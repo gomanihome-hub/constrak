@@ -13,6 +13,7 @@ const ALL_NAV = [
   { id: 'megaphone', label: 'מגפון',             icon: '📢', permission: 'sendBroadcast'  },
   { id: 'chat',      label: "צ'אט",              icon: '🗨️', permission: 'viewMessages'   },
   { id: 'safety',    label: 'תדרוך בטיחות',     icon: '🛡️', permission: 'viewSafety'     },
+  { id: 'documents', label: 'מסמכי פרויקט',     icon: '📁', permission: 'viewDocuments'  },
   { id: 'admin',     label: 'ניהול משתמשים',    icon: '⚙️', permission: 'viewAdminPanel' },
 ];
 
