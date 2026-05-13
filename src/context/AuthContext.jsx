@@ -7,12 +7,12 @@ const SYS_USERS_KEY  = 'constrak_system_users';
 
 // ─── Pre-seeded demo accounts ─────────────────────────────────────────────────
 const SEED_USERS = [
-  { uid: 'demo-001',    email: 'demo@constrak.co.il',    password: 'demo123',   displayName: 'משתמש דמו',    photoURL: null },
-  { uid: 'admin-001',   email: 'admin@constrak.co.il',   password: 'admin123',  displayName: 'מנהל מערכת',  photoURL: null },
-  { uid: 'pm-001',      email: 'pm@constrak.co.il',      password: 'pm123',     displayName: 'יוסי כהן',     photoURL: null },
-  { uid: 'sm-001',      email: 'sm@constrak.co.il',      password: 'sm123',     displayName: 'דנה לוי',      photoURL: null },
-  { uid: 'sub-001',     email: 'sub@constrak.co.il',     password: 'sub123',    displayName: 'דוד כהן',      photoURL: null },
-  { uid: 'worker-001',  email: 'worker@constrak.co.il',  password: 'worker123', displayName: 'גבי מזרחי',    photoURL: null },
+  { uid: 'demo-001',    email: 'demo@constrak.co.il',    password: 'demo123',   displayName: 'משתמש דמו',    photoURL: null, emailVerified: true  },
+  { uid: 'admin-001',   email: 'admin@constrak.co.il',   password: 'admin123',  displayName: 'מנהל מערכת',  photoURL: null, emailVerified: true  },
+  { uid: 'pm-001',      email: 'pm@constrak.co.il',      password: 'pm123',     displayName: 'יוסי כהן',     photoURL: null, emailVerified: true  },
+  { uid: 'sm-001',      email: 'sm@constrak.co.il',      password: 'sm123',     displayName: 'דנה לוי',      photoURL: null, emailVerified: true  },
+  { uid: 'sub-001',     email: 'sub@constrak.co.il',     password: 'sub123',    displayName: 'דוד כהן',      photoURL: null, emailVerified: true  },
+  { uid: 'worker-001',  email: 'worker@constrak.co.il',  password: 'worker123', displayName: 'גבי מזרחי',    photoURL: null, emailVerified: true  },
 ];
 
 export const DEMO_CREDENTIALS = { email: 'demo@constrak.co.il', password: 'demo123' };
@@ -43,8 +43,8 @@ function registerUser(user) {
 }
 
 function persistSession(user) {
-  const { uid, email, displayName, photoURL, provider } = user;
-  const slim = { uid, email, displayName, photoURL, provider };
+  const { uid, email, displayName, photoURL, provider, emailVerified, lastLoginAt } = user;
+  const slim = { uid, email, displayName, photoURL, provider, emailVerified: emailVerified ?? false, lastLoginAt: lastLoginAt ?? null };
   localStorage.setItem(SESSION_KEY, JSON.stringify(slim));
   return slim;
 }
@@ -84,7 +84,7 @@ export function AuthProvider({ children }) {
       if (e?.code) throw e;
     }
 
-    setUser(persistSession({ ...found, provider: 'email' }));
+    setUser(persistSession({ ...found, provider: 'email', lastLoginAt: new Date().toISOString() }));
   }
 
   async function register(email, password, displayName) {
@@ -93,7 +93,7 @@ export function AuthProvider({ children }) {
     if (users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase()))
       throw { code: 'auth/email-already-in-use' };
     if (password.length < 6) throw { code: 'auth/weak-password' };
-    const newUser = { uid: `user-${Date.now()}`, email: email.trim(), password, displayName, photoURL: null, provider: 'email' };
+    const newUser = { uid: `user-${Date.now()}`, email: email.trim(), password, displayName, photoURL: null, provider: 'email', emailVerified: false, lastLoginAt: new Date().toISOString() };
     registerUser(newUser);
     setUser(persistSession(newUser));
   }
@@ -139,6 +139,34 @@ export function AuthProvider({ children }) {
     return newUser.uid;
   }
 
+  async function updateProfile({ displayName, photoURL }) {
+    await delay(300);
+    if (!user) return;
+    const allUsers = getAllUsers();
+    const found = allUsers.find(u => u.uid === user.uid) ?? { uid: user.uid, email: user.email, password: '', emailVerified: user.emailVerified };
+    const updated = { ...found };
+    if (displayName !== undefined) updated.displayName = displayName;
+    if (photoURL    !== undefined) updated.photoURL    = photoURL;
+    registerUser(updated);
+    setUser(persistSession({ ...user, ...updated }));
+  }
+
+  async function changePassword(currentPassword, newPassword) {
+    await delay(500);
+    if (!user) throw { code: 'auth/user-not-found' };
+    const allUsers = getAllUsers();
+    const found = allUsers.find(u => u.uid === user.uid);
+    if (!found)                     throw { code: 'auth/user-not-found' };
+    if (found.password !== currentPassword) throw { code: 'auth/wrong-password' };
+    if (newPassword.length < 6)     throw { code: 'auth/weak-password' };
+    registerUser({ ...found, password: newPassword });
+  }
+
+  async function resendVerification() {
+    await delay(800);
+    return true;
+  }
+
   async function logout() {
     await delay(150);
     localStorage.removeItem(SESSION_KEY);
@@ -146,7 +174,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, authLoading, login, register, loginWithGoogle, loginWithFacebook, logout, addAuthUser, resetPassword }}>
+    <AuthContext.Provider value={{ user, authLoading, login, register, loginWithGoogle, loginWithFacebook, logout, addAuthUser, resetPassword, updateProfile, changePassword, resendVerification }}>
       {children}
     </AuthContext.Provider>
   );

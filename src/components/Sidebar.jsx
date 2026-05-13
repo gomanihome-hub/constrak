@@ -87,32 +87,39 @@ export default function Sidebar({ activePage, setActivePage }) {
       {/* Footer with real user info */}
       {!collapsed && (
         <div className="p-4 border-t border-slate-700">
-          <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActivePage('profile')}
+            className="w-full flex items-center gap-3 rounded-lg p-1 hover:bg-slate-800 transition-colors text-right"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit' }}
+            title="הפרופיל שלי"
+          >
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
               style={{ background: roleInfo?.color ?? '#f97316' }}
             >
               {initials || '?'}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate">{displayName}</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <span style={{ fontSize: 11 }}>{roleInfo?.icon}</span>
                 <p className="text-xs text-slate-400 truncate">{roleInfo?.label}</p>
               </div>
             </div>
-          </div>
+            <span style={{ fontSize: 11, color: '#64748b' }}>›</span>
+          </button>
         </div>
       )}
       {collapsed && (
         <div className="p-3 border-t border-slate-700 flex justify-center">
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
-            style={{ background: roleInfo?.color ?? '#f97316' }}
-            title={`${displayName} — ${roleInfo?.label}`}
+          <button
+            onClick={() => setActivePage('profile')}
+            className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm hover:ring-2 hover:ring-slate-400 transition-all"
+            style={{ background: roleInfo?.color ?? '#f97316', border: 'none', cursor: 'pointer', color: 'white' }}
+            title={`${displayName} — ${roleInfo?.label} — הפרופיל שלי`}
           >
             {initials || '?'}
-          </div>
+          </button>
         </div>
       )}
     </aside>

@@ -189,11 +189,16 @@ export function RolesProvider({ children }) {
     _save(systemUsers.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u));
   }
 
+  function updateCurrentUserProfile(changes) {
+    if (!currentSystemUser) return;
+    _save(systemUsers.map(u => u.id === currentSystemUser.id ? { ...u, ...changes } : u));
+  }
+
   return (
     <RolesContext.Provider value={{
       systemUsers, currentSystemUser, currentRole, can,
       getAssignedProjectIds,
-      createSystemUser, updateSystemUser, deleteSystemUser, toggleStatus,
+      createSystemUser, updateSystemUser, deleteSystemUser, toggleStatus, updateCurrentUserProfile,
     }}>
       {children}
     </RolesContext.Provider>

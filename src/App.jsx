@@ -20,6 +20,7 @@ import Megaphone from './pages/Megaphone';
 import Chat from './pages/Chat';
 import Safety from './pages/Safety';
 import Documents from './pages/Documents';
+import Profile from './pages/Profile';
 import './index.css';
 
 const FULL_PAGES = {
@@ -34,6 +35,7 @@ const FULL_PAGES = {
   chat:      Chat,
   safety:    Safety,
   documents: Documents,
+  profile:   Profile,
   admin:     AdminPanel,
 };
 
@@ -78,9 +80,9 @@ export default function App() {
     <div className="flex min-h-screen bg-slate-50" dir="rtl">
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <div className="flex-1 flex flex-col min-w-0">
-        <Header activePage={activePage} />
+        <Header activePage={activePage} setActivePage={setActivePage} />
         <main className="flex-1 overflow-auto">
-          <PageComponent />
+          <PageComponent setActivePage={setActivePage} />
         </main>
       </div>
     </div>

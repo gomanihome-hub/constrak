@@ -10,9 +10,15 @@ const pageTitles = {
   materials: 'ניהול חומרים',
   worklog:   'יומן עבודה יומי',
   admin:     'ניהול משתמשים',
+  profile:   'הפרופיל שלי',
+  documents: 'מסמכי פרויקט',
+  chat:      "צ'אט",
+  safety:    'תדרוך בטיחות',
+  messages:  'הודעות',
+  megaphone: 'מגפון',
 };
 
-export default function Header({ activePage }) {
+export default function Header({ activePage, setActivePage }) {
   const { user, logout } = useAuth();
   const { currentRole } = useRoles();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -118,9 +124,8 @@ export default function Header({ activePage }) {
               </div>
 
               <div style={{ padding: '6px' }}>
-                <MenuItem icon="👤" label="הפרופיל שלי" />
-                <MenuItem icon="🔒" label="שינוי סיסמה" />
-                <MenuItem icon="🔔" label="הגדרות התראות" />
+                <MenuItem icon="👤" label="הפרופיל שלי" onClick={() => { setMenuOpen(false); setActivePage?.('profile'); }} />
+                <MenuItem icon="🔒" label="שינוי סיסמה"  onClick={() => { setMenuOpen(false); setActivePage?.('profile'); }} />
               </div>
 
               <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px' }}>
@@ -162,10 +167,11 @@ function Avatar({ user, initials, size }) {
   );
 }
 
-function MenuItem({ icon, label }) {
+function MenuItem({ icon, label, onClick }) {
   const [hovered, setHovered] = useState(false);
   return (
     <button
+      onClick={onClick}
       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, border: 'none', background: hovered ? '#f8fafc' : 'transparent', cursor: 'pointer', fontSize: 14, color: '#374151', fontWeight: 400, textAlign: 'right', transition: 'background 0.15s' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
