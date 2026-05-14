@@ -18,6 +18,7 @@ const pageTitles = {
   safety:    'תדרוך בטיחות',
   messages:  'הודעות',
   megaphone: 'מגפון',
+  receiving: 'קבלת חומרים',
 };
 
 export default function Header({ activePage, setActivePage }) {

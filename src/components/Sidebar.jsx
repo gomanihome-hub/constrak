@@ -14,6 +14,7 @@ const ALL_NAV = [
   { id: 'messages',      label: 'הודעות',            icon: '💬', permission: 'sendMessage'       },
   { id: 'megaphone',     label: 'מגפון',             icon: '📢', permission: 'sendBroadcast'     },
   { id: 'chat',          label: "צ'אט",              icon: '🗨️', permission: 'viewMessages'      },
+  { id: 'receiving',     label: 'קבלת חומרים',      icon: '📥', permission: 'viewReceiving'     },
   { id: 'safety',        label: 'תדרוך בטיחות',     icon: '🛡️', permission: 'viewSafety'        },
   { id: 'documents',     label: 'מסמכי פרויקט',     icon: '📁', permission: 'viewDocuments'     },
   { id: 'admin',         label: 'ניהול משתמשים',    icon: '⚙️', permission: 'viewAdminPanel'    },

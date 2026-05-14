@@ -23,6 +23,7 @@ import Safety from './pages/Safety';
 import Documents from './pages/Documents';
 import Profile from './pages/Profile';
 import Notifications from './pages/Notifications';
+import Receiving from './pages/Receiving';
 import './index.css';
 
 const FULL_PAGES = {
@@ -39,7 +40,8 @@ const FULL_PAGES = {
   documents:     Documents,
   profile:       Profile,
   notifications: Notifications,
-  admin:     AdminPanel,
+  receiving:     Receiving,
+  admin:         AdminPanel,
 };
 
 export default function App() {
