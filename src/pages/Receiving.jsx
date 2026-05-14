@@ -1209,8 +1209,8 @@ export default function Receiving() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 22 }}>
+      {/* Stats — only for receipts/orders tabs */}
+      {(tab === 'receipts' || tab === 'orders') && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 22 }}>
         {[
           { icon: '📋', label: 'הזמנות פתוחות', value: openOrderCount, color: '#d97706', bg: '#fef3c7', border: '#fde68a' },
           { icon: '📅', label: 'קבלות היום',     value: todayCount,    color: '#4fb8e0', bg: '#f0f9ff', border: '#bae6fd' },
@@ -1225,9 +1225,10 @@ export default function Receiving() {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
-      {/* Filter bar */}
+      {/* Filter bar — only for receipts/orders tabs */}
+      {(tab === 'receipts' || tab === 'orders') &&
       <div style={{ background: 'white', borderRadius: 12, padding: '12px 16px', marginBottom: 16, border: '1px solid #e2e8f0', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={filterProject} onChange={e => setFP(e.target.value)}
           style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 11px', fontSize: 13, outline: 'none', background: 'white' }}>
@@ -1277,10 +1278,10 @@ export default function Receiving() {
             נקה סינון
           </button>
         )}
-      </div>
+      </div>}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: 18 }}>
+      <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: 18, overflowX: 'auto' }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             style={{ padding: '10px 20px', border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: tab === t.id ? 700 : 500, color: tab === t.id ? TEAL : '#64748b', borderBottom: tab === t.id ? `2px solid ${TEAL}` : '2px solid transparent', fontSize: 14, marginBottom: -2, whiteSpace: 'nowrap' }}>
