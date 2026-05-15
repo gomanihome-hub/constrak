@@ -24,6 +24,7 @@ import Documents from './pages/Documents';
 import Profile from './pages/Profile';
 import Notifications from './pages/Notifications';
 import Receiving from './pages/Receiving';
+import Reports from './pages/Reports';
 import './index.css';
 
 const FULL_PAGES = {
@@ -41,6 +42,7 @@ const FULL_PAGES = {
   profile:       Profile,
   notifications: Notifications,
   receiving:     Receiving,
+  reports:       Reports,
   admin:         AdminPanel,
 };
 

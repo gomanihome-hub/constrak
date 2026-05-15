@@ -163,6 +163,7 @@ export function RolesProvider({ children }) {
     viewNotifications: ['admin','project_manager','site_manager'].includes(currentRole),
     configureAlerts:   ['admin','project_manager'].includes(currentRole),
     viewReceiving:     ['admin','project_manager','site_manager'].includes(currentRole),
+    viewReports:       ['admin','project_manager','site_manager'].includes(currentRole),
   }), [currentRole]);
 
   // Returns null (= all) for admin, otherwise the list of project ID strings
