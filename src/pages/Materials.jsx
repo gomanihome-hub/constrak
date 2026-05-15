@@ -13,13 +13,12 @@ const fmtNum = n =>
 
 // ─── Weighted-average aggregator ──────────────────────────────────────────────
 // priceState: 'none' | 'not_received' | 'no_price' | 'has_price'
-function calcStats(catalogNum, allOrders, allReceipts) {
+function calcStats(catalogNum, materialName, allOrders, allReceipts) {
   // ── 1. כמות שהוזמנה — from orders ────────────────────────────────────────
   let totalOrderedQty = 0;
 
-  // Build map: `${orderId}::${itemId}` → unitPrice
-  // Only for order items whose catalogNum matches.
-  const priceMap = new Map(); // key → unitPrice (number, may be 0/null)
+  // Build map: `${orderId}::${itemId}` → unitPrice  (used only for price lookup)
+  const priceMap = new Map();
 
   for (const order of allOrders) {
     for (const item of order.items ?? []) {
@@ -29,38 +28,46 @@ function calcStats(catalogNum, allOrders, allReceipts) {
     }
   }
 
-  // ── 2. עלות יחידה ממוצעת — from receipts ────────────────────────────────
-  let totalReceivedQty   = 0; // all received (with or without price)
-  let pricedReceivedQty  = 0; // Σ receivedQty where unitPrice > 0
-  let pricedReceivedVal  = 0; // Σ receivedQty × unitPrice
+  // ── 2. כמות שהתקבלה — match receipt items by name ────────────────────────
+  // Receipt items do not store catalogNum, only name. Matching by name is the
+  // only reliable join that works for both current and historical receipts
+  // (historical receipts may reference orders that no longer exist in the list).
+  let totalReceivedQty  = 0;
+  let pricedReceivedQty = 0; // Σ receivedQty where a unitPrice could be found
+  let pricedReceivedVal = 0; // Σ receivedQty × unitPrice
 
   for (const receipt of allReceipts) {
     for (const rItem of receipt.items ?? []) {
-      const key   = `${receipt.orderId}::${rItem.itemId}`;
-      if (!priceMap.has(key)) continue; // not our catalog item
-      const price       = priceMap.get(key);
+      if (rItem.name !== materialName) continue; // identify by catalog item name
       const receivedQty = Number(rItem.receivedQty) || 0;
       totalReceivedQty += receivedQty;
-      if (price > 0) {
-        pricedReceivedQty += receivedQty;
-        pricedReceivedVal += receivedQty * price;
+
+      // Try to look up unit price via the order this receipt was made against
+      const priceKey = `${receipt.orderId}::${rItem.itemId}`;
+      if (priceMap.has(priceKey)) {
+        const price = priceMap.get(priceKey);
+        if (price > 0) {
+          pricedReceivedQty += receivedQty;
+          pricedReceivedVal += receivedQty * price;
+        }
       }
     }
   }
 
+  // ── 3. עלות יחידה ממוצעת (weighted) & עלות כוללת ────────────────────────
   const weightedAvgPrice =
     pricedReceivedQty > 0 ? pricedReceivedVal / pricedReceivedQty : 0;
 
-  const totalCost = totalOrderedQty * weightedAvgPrice;
+  const totalCost = totalReceivedQty * weightedAvgPrice;
 
-  // ── 3. Price display state ────────────────────────────────────────────────
+  // ── 4. Price display state ────────────────────────────────────────────────
   let priceState;
   if (totalOrderedQty === 0)       priceState = 'none';          // not ordered at all
   else if (totalReceivedQty === 0) priceState = 'not_received';  // ordered, nothing received yet
   else if (weightedAvgPrice === 0) priceState = 'no_price';      // received but no price in PO
   else                             priceState = 'has_price';
 
-  return { totalOrderedQty, weightedAvgPrice, totalCost, priceState };
+  return { totalOrderedQty, totalReceivedQty, weightedAvgPrice, totalCost, priceState };
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -88,7 +95,7 @@ export default function Materials() {
 
   const rows = useMemo(() => catalog.map(item => ({
     ...item,
-    ...calcStats(item.catalogNum, orders, receipts),
+    ...calcStats(item.catalogNum, item.name, orders, receipts),
   })), [catalog, orders, receipts]);
 
   // Only show materials that have been received with a known price (totalCost > 0)
@@ -103,8 +110,9 @@ export default function Materials() {
     return matchSearch && matchCat;
   }), [visibleRows, search, catFilter]);
 
-  const grandTotalQty   = visibleRows.reduce((s, r) => s + r.totalOrderedQty, 0);
-  const grandTotalCost  = visibleRows.reduce((s, r) => s + r.totalCost, 0);
+  const grandTotalOrderedQty   = visibleRows.reduce((s, r) => s + r.totalOrderedQty, 0);
+  const grandTotalReceivedQty  = visibleRows.reduce((s, r) => s + r.totalReceivedQty, 0);
+  const grandTotalCost         = visibleRows.reduce((s, r) => s + r.totalCost, 0);
   const itemsWithOrders = visibleRows.length;
 
   // ── Summary cards ────────────────────────────────────────────────────────────
@@ -141,7 +149,7 @@ export default function Materials() {
           icon="💰" value={grandTotalCost > 0 ? fmt(grandTotalCost) : '—'}
           label="ערך כולל (הוזמן × מחיר שהתקבל)"
           color="#16a34a" bg="#f0fdf4" border="#86efac"
-          sub={grandTotalQty > 0 ? `${fmtNum(grandTotalQty)} יחידות הוזמנו` : 'אין הזמנות'}
+          sub={grandTotalOrderedQty > 0 ? `${fmtNum(grandTotalOrderedQty)} הוזמנו · ${fmtNum(grandTotalReceivedQty)} התקבלו` : 'אין הזמנות'}
         />
       </div>
 
@@ -191,6 +199,7 @@ export default function Materials() {
                   'קטגוריה',
                   'יחידה',
                   'כמות שהוזמנה',
+                  'כמות שהתקבלה',
                   'עלות יחידה ממוצעת',
                   'עלות כוללת',
                 ].map(h => (
@@ -205,7 +214,7 @@ export default function Materials() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8' }}>
+                  <td colSpan={8} style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8' }}>
                     <p style={{ fontSize: 28, margin: '0 0 8px' }}>🔍</p>
                     <p style={{ margin: 0, fontWeight: 600 }}>אין תוצאות לחיפוש זה</p>
                   </td>
@@ -226,6 +235,9 @@ export default function Materials() {
                   </td>
                   <td style={{ padding: '12px 14px', fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>
                     {fmtNum(filtered.reduce((s, r) => s + r.totalOrderedQty, 0))}
+                  </td>
+                  <td style={{ padding: '12px 14px', fontWeight: 800, color: '#0369a1', textAlign: 'center' }}>
+                    {fmtNum(filtered.reduce((s, r) => s + r.totalReceivedQty, 0))}
                   </td>
                   <td style={{ padding: '12px 14px', color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
                     ממוצע משוקלל
@@ -258,7 +270,7 @@ export default function Materials() {
 function MaterialRow({ row, even }) {
   const [hov, setHov] = useState(false);
   const cat = CATALOG_CATEGORIES.find(c => c.id === row.category);
-  const { totalOrderedQty, weightedAvgPrice, totalCost, priceState } = row;
+  const { totalOrderedQty, totalReceivedQty, weightedAvgPrice, totalCost, priceState } = row;
 
   return (
     <tr
@@ -314,12 +326,9 @@ function MaterialRow({ row, even }) {
         )}
       </td>
 
-      {/* עלות יחידה ממוצעת */}
+      {/* כמות שהתקבלה */}
       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-        {priceState === 'has_price' && (
-          <span style={{ fontWeight: 700, color: '#7c3aed', fontSize: 14 }}>{fmt(weightedAvgPrice)}</span>
-        )}
-        {priceState === 'not_received' && (
+        {priceState === 'not_received' ? (
           <span style={{
             fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
             background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa',
@@ -327,6 +336,20 @@ function MaterialRow({ row, even }) {
           }}>
             ⏳ טרם התקבל
           </span>
+        ) : totalReceivedQty > 0 ? (
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#0369a1' }}>{fmtNum(totalReceivedQty)}</span>
+        ) : (
+          <span style={{ color: '#cbd5e1', fontSize: 13 }}>0</span>
+        )}
+      </td>
+
+      {/* עלות יחידה ממוצעת */}
+      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+        {priceState === 'has_price' && (
+          <span style={{ fontWeight: 700, color: '#7c3aed', fontSize: 14 }}>{fmt(weightedAvgPrice)}</span>
+        )}
+        {priceState === 'not_received' && (
+          <span style={{ color: '#cbd5e1', fontSize: 13 }}>—</span>
         )}
         {priceState === 'no_price' && (
           <span style={{ fontSize: 12, color: '#94a3b8' }}>אין מחיר בהזמנה</span>

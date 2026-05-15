@@ -1141,27 +1141,22 @@ export default function Receiving() {
   }, []);
 
   function handleSaveReceipt(receipt) {
-    setData(prev => {
-      const next = { ...prev, receipts: [...prev.receipts, receipt] };
-      saveReceiving(next);
-      return next;
-    });
+    const next = { ...data, receipts: [...data.receipts, receipt] };
+    saveReceiving(next);
+    setData(next);
   }
 
   function handleSaveOrder(order) {
-    setData(prev => {
-      const next = { ...prev, orders: [order, ...prev.orders] };
-      saveReceiving(next);
-      return next;
-    });
+    if (data.orders.some(o => o.id === order.id)) return;
+    const next = { ...data, orders: [order, ...data.orders] };
+    saveReceiving(next);
+    setData(next);
   }
 
   function handleCancelOrder(orderId) {
-    setData(prev => {
-      const next = { ...prev, orders: prev.orders.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o) };
-      saveReceiving(next);
-      return next;
-    });
+    const next = { ...data, orders: data.orders.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o) };
+    saveReceiving(next);
+    setData(next);
   }
 
   const [wizardInitialOrder, setWizardInitialOrder] = useState(null);

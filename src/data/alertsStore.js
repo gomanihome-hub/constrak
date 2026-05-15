@@ -2,11 +2,7 @@ import { subcontractors } from './mockData';
 
 const ALERT_KEY = 'constrak_alerts';
 
-export const ALERT_PROJECTS = [
-  { id: '1', name: 'מגדל רמת גן' },
-  { id: '2', name: 'מרכז מסחרי תל אביב' },
-  { id: '3', name: 'וילות הרצליה פיתוח' },
-];
+export const ALERT_PROJECTS = [];
 
 // Maps WorkLog/mockData project names → alert project IDs
 const PROJECT_NAME_TO_ID = {
@@ -25,37 +21,7 @@ export const DEFAULT_SETTINGS = {
   globalEnabled: true,
   dayPlanTime:   '09:00',
   workLogTime:   '18:00',
-  projects: {
-    '1': { enabled: true, dayPlanEnabled: true, workLogEnabled: true, customDayPlanTime: '', customWorkLogTime: '' },
-    '2': { enabled: true, dayPlanEnabled: true, workLogEnabled: true, customDayPlanTime: '', customWorkLogTime: '' },
-    '3': { enabled: true, dayPlanEnabled: true, workLogEnabled: true, customDayPlanTime: '', customWorkLogTime: '' },
-  },
-};
-
-// Seed historical notifications so the bell is populated immediately
-const D1 = '2026-05-12';
-const D2 = '2026-05-11';
-
-const SEED_NOTIFICATIONS = [
-  // Yesterday – work log missing (project 1)
-  { id: 'seed-wl-1-1',  type: 'missing_work_log', projectId: '1', projectName: 'מגדל רמת גן',         contractorId: 1,  contractorName: 'דוד כהן',     contractorTrade: 'צביעה',      date: D1, triggeredAt: `${D1}T18:00:00.000Z`, readBy: [], dismissed: false },
-  { id: 'seed-wl-1-4',  type: 'missing_work_log', projectId: '1', projectName: 'מגדל רמת גן',         contractorId: 4,  contractorName: 'אבי גפן',     contractorTrade: 'גבס',        date: D1, triggeredAt: `${D1}T18:00:00.000Z`, readBy: [], dismissed: false },
-  { id: 'seed-wl-1-7',  type: 'missing_work_log', projectId: '1', projectName: 'מגדל רמת גן',         contractorId: 7,  contractorName: 'גיל שמואל',   contractorTrade: 'ריצוף',      date: D1, triggeredAt: `${D1}T18:00:00.000Z`, readBy: [], dismissed: false },
-  { id: 'seed-wl-3-8',  type: 'missing_work_log', projectId: '3', projectName: 'וילות הרצליה פיתוח', contractorId: 8,  contractorName: 'עמי כץ',      contractorTrade: 'מסגרות',     date: D1, triggeredAt: `${D1}T18:00:00.000Z`, readBy: [], dismissed: false },
-  { id: 'seed-wl-3-11', type: 'missing_work_log', projectId: '3', projectName: 'וילות הרצליה פיתוח', contractorId: 11, contractorName: 'אילן פרידמן', contractorTrade: 'טיח',        date: D1, triggeredAt: `${D1}T18:00:00.000Z`, readBy: [], dismissed: false },
-  // Yesterday – day plan missing (project 2)
-  { id: 'seed-dp-2-3',  type: 'missing_day_plan', projectId: '2', projectName: 'מרכז מסחרי תל אביב', contractorId: 3,  contractorName: 'מאיר ברק',    contractorTrade: 'קרמיקה',    date: D1, triggeredAt: `${D1}T09:00:00.000Z`, readBy: [], dismissed: false },
-  // Day before – work log missing (project 1)
-  { id: 'seed-wl-1-2-d2', type: 'missing_work_log', projectId: '1', projectName: 'מגדל רמת גן',      contractorId: 2,  contractorName: 'יוסי לוי',    contractorTrade: 'אלומיניום', date: D2, triggeredAt: `${D2}T18:00:00.000Z`, readBy: [], dismissed: false },
-  // Day before – day plan missing (project 3)
-  { id: 'seed-dp-3-5-d2', type: 'missing_day_plan', projectId: '3', projectName: 'וילות הרצליה פיתוח', contractorId: 5, contractorName: 'רון שלום',   contractorTrade: 'אינסטלציה', date: D2, triggeredAt: `${D2}T09:00:00.000Z`, readBy: [], dismissed: false },
-];
-
-const SEED_LAST_RUN = {
-  [`dayPlan::1::${D1}`]: true, [`dayPlan::2::${D1}`]: true, [`dayPlan::3::${D1}`]: true,
-  [`workLog::1::${D1}`]: true, [`workLog::2::${D1}`]: true, [`workLog::3::${D1}`]: true,
-  [`dayPlan::1::${D2}`]: true, [`dayPlan::2::${D2}`]: true, [`dayPlan::3::${D2}`]: true,
-  [`workLog::1::${D2}`]: true, [`workLog::2::${D2}`]: true, [`workLog::3::${D2}`]: true,
+  projects: {},
 };
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
@@ -63,11 +29,7 @@ export function loadAlerts() {
   try {
     const stored = JSON.parse(localStorage.getItem(ALERT_KEY) || 'null');
     if (!stored) {
-      return {
-        settings: DEFAULT_SETTINGS,
-        notifications: SEED_NOTIFICATIONS.map(n => ({ ...n })),
-        lastRun: { ...SEED_LAST_RUN },
-      };
+      return { settings: DEFAULT_SETTINGS, notifications: [], lastRun: {} };
     }
     return {
       settings: {
@@ -75,11 +37,11 @@ export function loadAlerts() {
         ...stored.settings,
         projects: { ...DEFAULT_SETTINGS.projects, ...(stored.settings?.projects ?? {}) },
       },
-      notifications: stored.notifications ?? SEED_NOTIFICATIONS.map(n => ({ ...n })),
-      lastRun:        stored.lastRun        ?? { ...SEED_LAST_RUN },
+      notifications: stored.notifications ?? [],
+      lastRun:        stored.lastRun        ?? {},
     };
   } catch {
-    return { settings: DEFAULT_SETTINGS, notifications: SEED_NOTIFICATIONS.map(n => ({ ...n })), lastRun: { ...SEED_LAST_RUN } };
+    return { settings: DEFAULT_SETTINGS, notifications: [], lastRun: {} };
   }
 }
 

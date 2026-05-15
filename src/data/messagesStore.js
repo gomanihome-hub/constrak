@@ -1,62 +1,15 @@
 export const MSG_KEY = 'constrak_messages';
 
-export const PROJECTS = [
-  { id: '1', name: 'מגדל רמת גן' },
-  { id: '2', name: 'שכונת הדר' },
-  { id: '3', name: 'פרויקט חיפה' },
-  { id: '4', name: 'מרכז לוד' },
-];
+export const PROJECTS = [];
 
-export const SITES = [
-  { id: '1', name: 'אתר מגדל רמת גן' },
-  { id: '2', name: 'אתר שכונת הדר' },
-  { id: '3', name: 'אתר חיפה' },
-];
-
-export const SEED_MSGS = [
-  {
-    id: 'msg-s001',
-    fromId: 'admin-001', fromName: 'מנהל מערכת', fromRole: 'admin',
-    toScope: 'broadcast', toId: null,
-    subject: 'תזכורת בטיחות חודשית',
-    body: 'מחר תתקיים ביקורת בטיחות בכל אתרי החברה. אנא וודאו שכל ציוד המגן זמין ושטחי העבודה מסודרים. נוכחות חובה לכל מנהלי האתרים.',
-    sentAt: '2026-05-10T09:00:00.000Z', readBy: [],
-  },
-  {
-    id: 'msg-s002',
-    fromId: 'pm-001', fromName: 'יוסי כהן', fromRole: 'project_manager',
-    toScope: 'project', toId: '1',
-    subject: 'עדכון לוח זמנים — מגדל רמת גן',
-    body: 'לתשומת לב כולם — לאור ההתקדמות המשביעת רצון, עבודות הצבע יחלו ב-15 למאי. נא לתאם עם מנהל האתר ולוודא שהחומרים זמינים.',
-    sentAt: '2026-05-11T08:30:00.000Z', readBy: [],
-  },
-  {
-    id: 'msg-s003',
-    fromId: 'sm-001', fromName: 'דנה לוי', fromRole: 'site_manager',
-    toScope: 'site', toId: '1',
-    subject: 'כניסה לאתר מחר',
-    body: 'בדיקת בטיחות מחר בין 7:00-8:00. כל הקבלנים נדרשים להגיע לאחר השעה 8:00 בלבד. נא לעדכן את הפועלים שלכם בהתאם.',
-    sentAt: '2026-05-11T14:00:00.000Z', readBy: [],
-  },
-  {
-    id: 'msg-s004',
-    fromId: 'sub-001', fromName: 'דוד כהן', fromRole: 'subcontractor',
-    toScope: 'user', toId: 'worker-001',
-    subject: 'משימה דחופה — קיר D4',
-    body: 'גבי, אנא התפנה לצביעת קיר D4 (לבן, 2 שכבות) עד 16:00 היום. החומרים נמצאים בסטור ליד כניסה ב׳.',
-    sentAt: '2026-05-11T07:00:00.000Z', readBy: [],
-  },
-];
+export const SITES = [];
 
 export function loadMsgs() {
   try {
     const raw = localStorage.getItem(MSG_KEY);
-    if (!raw) { saveMsgs(SEED_MSGS); return [...SEED_MSGS]; }
-    const stored = JSON.parse(raw);
-    const ids = new Set(stored.map(m => m.id));
-    const extras = SEED_MSGS.filter(m => !ids.has(m.id));
-    return [...stored, ...extras].sort((a, b) => b.sentAt.localeCompare(a.sentAt));
-  } catch { return [...SEED_MSGS]; }
+    if (!raw) return [];
+    return JSON.parse(raw).sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+  } catch { return []; }
 }
 
 export function saveMsgs(msgs) {

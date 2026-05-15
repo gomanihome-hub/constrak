@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth, firebaseErrorToHebrew, DEMO_CREDENTIALS } from '../context/AuthContext';
+import { useAuth, firebaseErrorToHebrew } from '../context/AuthContext';
 
 const TEAL = '#80cded';
 const TEAL_DARK = '#4fb8e0';
@@ -81,12 +81,6 @@ export default function LoginPage({ onRegister }) {
 
   const busy = loading !== null;
 
-  function fillDemo() {
-    setEmail(DEMO_CREDENTIALS.email);
-    setPassword(DEMO_CREDENTIALS.password);
-    setError('');
-  }
-
   return (
     <div dir="rtl" style={{ minHeight:'100vh', display:'flex', fontFamily:"'Segoe UI', system-ui, sans-serif", background:`linear-gradient(160deg, #4fb8e0 0%, ${TEAL} 50%, #c2ebf8 100%)` }}>
 
@@ -123,34 +117,8 @@ export default function LoginPage({ onRegister }) {
           </div>
 
           <div style={{ marginBottom:20, textAlign:'right' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
-              <h2 style={{ margin:0, fontSize:26, fontWeight:700, color:'#1e293b' }}>כניסה למערכת</h2>
-              <span style={{ fontSize:11, fontWeight:700, letterSpacing:'0.5px', color:'#92400e', background:'#fef3c7', border:'1px solid #fde68a', borderRadius:20, padding:'3px 10px' }}>
-                מצב דמו
-              </span>
-            </div>
+            <h2 style={{ margin:0, fontSize:26, fontWeight:700, color:'#1e293b' }}>כניסה למערכת</h2>
             <p style={{ margin:'6px 0 0', fontSize:14, color:'#64748b' }}>ברוכים השבים לקונסטרק</p>
-          </div>
-
-          {/* Demo credentials hint */}
-          <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:12, padding:'12px 14px', marginBottom:20 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-              <button
-                type="button"
-                onClick={fillDemo}
-                style={{ fontSize:12, fontWeight:700, color:'#92400e', background:'#fde68a', border:'none', borderRadius:8, padding:'5px 12px', cursor:'pointer', whiteSpace:'nowrap', transition:'background 0.15s' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#fcd34d'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#fde68a'; }}
-              >
-                מלא אוטומטית
-              </button>
-              <div style={{ textAlign:'right' }}>
-                <p style={{ margin:0, fontSize:12, fontWeight:600, color:'#92400e' }}>🔑 פרטי כניסה לדמו</p>
-                <p style={{ margin:'3px 0 0', fontSize:11, color:'#a16207', fontFamily:'monospace', direction:'ltr', textAlign:'left' }}>
-                  {DEMO_CREDENTIALS.email} / {DEMO_CREDENTIALS.password}
-                </p>
-              </div>
-            </div>
           </div>
 
           {error && (

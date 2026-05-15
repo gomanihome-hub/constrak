@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoles } from '../context/RolesContext';
 import {
   loadSafetyData, saveSafetyData, getActiveRules, getStaleWorkers,
-  SAFETY_PROJECTS, SEED_RULES,
+  SAFETY_PROJECTS,
 } from '../data/safetyStore';
 
 // ─── Main page ────────────────────────────────────────────────────────────────

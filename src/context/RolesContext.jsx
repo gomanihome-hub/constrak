@@ -27,17 +27,18 @@ export const PERMISSIONS = [
   { key: 'manageUsers',    label: 'ניהול משתמשים',    admin: true,     pm: false,      sm: false,      sub: false,    worker: false    },
 ];
 
-// ─── Seed users ───────────────────────────────────────────────────────────────
+// ─── Default admin account (always exists, cannot be removed or disabled) ─────
+const ADMIN_ID = 'admin-001';
+
 const SEED_SYSTEM_USERS = [
-  { id: 'demo-001',       email: 'demo@constrak.co.il',    displayName: 'משתמש דמו',    phone: '050-1234567', role: 'admin',           assignedProjects: [],          assignedSite: null, status: 'active', createdAt: '2026-01-01' },
-  { id: 'admin-001',      email: 'admin@constrak.co.il',   displayName: 'מנהל מערכת',  phone: '052-9876543', role: 'admin',           assignedProjects: [],          assignedSite: null, status: 'active', createdAt: '2026-01-01' },
-  { id: 'pm-001',         email: 'pm@constrak.co.il',      displayName: 'יוסי כהן',     phone: '054-1111111', role: 'project_manager', assignedProjects: ['1', '2'],  assignedSite: null, status: 'active', createdAt: '2026-02-01' },
-  { id: 'sm-001',         email: 'sm@constrak.co.il',      displayName: 'דנה לוי',      phone: '058-2222222', role: 'site_manager',    assignedProjects: ['1'],       assignedSite: '1',  status: 'active', createdAt: '2026-02-15' },
-  { id: 'sub-001',        email: 'sub@constrak.co.il',     displayName: 'דוד כהן',      phone: '050-3333333', role: 'subcontractor',   assignedProjects: ['1'],       assignedSite: '1',  status: 'active', trade: 'צביעה', createdAt: '2026-03-10' },
-  { id: 'worker-001',     email: 'worker@constrak.co.il',  displayName: 'גבי מזרחי',    phone: '052-4444444', role: 'worker',          assignedProjects: ['1'],       assignedSite: '1',  status: 'active', createdAt: '2026-03-15' },
-  { id: 'google-mock-001',    email: 'google.demo@gmail.com',      displayName: 'Google Demo',   phone: '', role: 'project_manager', assignedProjects: ['1', '3'],  assignedSite: null, status: 'active', createdAt: '2026-03-01' },
-  { id: 'facebook-mock-001',  email: 'facebook.demo@example.com',  displayName: 'Facebook Demo', phone: '', role: 'site_manager',    assignedProjects: ['2'],       assignedSite: '2',  status: 'active', createdAt: '2026-03-01' },
+  { id: ADMIN_ID, email: 'admin@constrak.co.il', displayName: 'מנהל מערכת', phone: '', role: 'admin', assignedProjects: [], assignedSite: null, status: 'active', createdAt: '2026-01-01' },
 ];
+
+// IDs from the old demo dataset — purged automatically from legacy localStorage
+const LEGACY_DEMO_IDS = new Set([
+  'demo-001', 'pm-001', 'sm-001', 'sub-001', 'worker-001',
+  'google-mock-001', 'facebook-mock-001',
+]);
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 function defaultSystemEntry(au) {
@@ -58,22 +59,24 @@ function loadSystemUsers() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
 
-    // Build base: seeds merged with any saved overrides / extras
     let base;
     if (!stored) {
       base = [...SEED_SYSTEM_USERS];
     } else {
-      const overrides = new Map(stored.map(u => [u.id, u]));
-      const merged = SEED_SYSTEM_USERS.map(s => overrides.has(s.id) ? { ...s, ...overrides.get(s.id) } : s);
-      const extras = stored.filter(u => !SEED_SYSTEM_USERS.find(s => s.id === u.id));
+      // Strip legacy demo entries before merging so they don't resurface
+      const cleanStored = stored.filter(u => !LEGACY_DEMO_IDS.has(u.id));
+      const overrides   = new Map(cleanStored.map(u => [u.id, u]));
+      const merged      = SEED_SYSTEM_USERS.map(s => overrides.has(s.id) ? { ...s, ...overrides.get(s.id) } : s);
+      const extras      = cleanStored.filter(u => !SEED_SYSTEM_USERS.find(s => s.id === u.id));
       base = [...merged, ...extras];
     }
 
     // Pull in any users registered via AuthContext that aren't already tracked here
-    const authExtras = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '[]');
-    const existingIds    = new Set(base.map(u => u.id));
-    const existingEmails = new Set(base.map(u => u.email?.toLowerCase()).filter(Boolean));
-    for (const au of authExtras) {
+    const authExtras      = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '[]');
+    const cleanAuthExtras = authExtras.filter(u => !LEGACY_DEMO_IDS.has(u.uid));
+    const existingIds     = new Set(base.map(u => u.id));
+    const existingEmails  = new Set(base.map(u => u.email?.toLowerCase()).filter(Boolean));
+    for (const au of cleanAuthExtras) {
       if (!existingIds.has(au.uid) && !existingEmails.has(au.email?.toLowerCase())) {
         base.push(defaultSystemEntry(au));
       }
@@ -81,7 +84,7 @@ function loadSystemUsers() {
 
     return base;
   } catch {
-    return SEED_SYSTEM_USERS;
+    return [...SEED_SYSTEM_USERS];
   }
 }
 
@@ -100,12 +103,13 @@ export function RolesProvider({ children }) {
   // appear immediately in the admin panel (not just the currently logged-in one).
   useEffect(() => {
     setSystemUsers(prev => {
-      const authExtras = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '[]');
-      const existingIds    = new Set(prev.map(u => u.id));
-      const existingEmails = new Set(prev.map(u => u.email?.toLowerCase()).filter(Boolean));
+      const authExtras      = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '[]');
+      const cleanAuthExtras = authExtras.filter(u => !LEGACY_DEMO_IDS.has(u.uid));
+      const existingIds     = new Set(prev.map(u => u.id));
+      const existingEmails  = new Set(prev.map(u => u.email?.toLowerCase()).filter(Boolean));
 
       const toAdd = [];
-      for (const au of authExtras) {
+      for (const au of cleanAuthExtras) {
         if (!existingIds.has(au.uid) && !existingEmails.has(au.email?.toLowerCase())) {
           toAdd.push(defaultSystemEntry(au));
         }
@@ -186,10 +190,12 @@ export function RolesProvider({ children }) {
   }
 
   function deleteSystemUser(id) {
+    if (id === ADMIN_ID) return; // default admin cannot be deleted
     _save(systemUsers.filter(u => u.id !== id));
   }
 
   function toggleStatus(id) {
+    if (id === ADMIN_ID) return; // default admin cannot be deactivated
     _save(systemUsers.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u));
   }
 

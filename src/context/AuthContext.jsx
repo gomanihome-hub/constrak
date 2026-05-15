@@ -5,17 +5,18 @@ const SESSION_KEY    = 'constrak_auth_user';
 const USERS_KEY      = 'constrak_auth_users';
 const SYS_USERS_KEY  = 'constrak_system_users';
 
-// ─── Pre-seeded demo accounts ─────────────────────────────────────────────────
+// ─── Default admin account (always exists, cannot be removed) ────────────────
+export const ADMIN_UID = 'admin-001';
+
 const SEED_USERS = [
-  { uid: 'demo-001',    email: 'demo@constrak.co.il',    password: 'demo123',   displayName: 'משתמש דמו',    photoURL: null, emailVerified: true  },
-  { uid: 'admin-001',   email: 'admin@constrak.co.il',   password: 'admin123',  displayName: 'מנהל מערכת',  photoURL: null, emailVerified: true  },
-  { uid: 'pm-001',      email: 'pm@constrak.co.il',      password: 'pm123',     displayName: 'יוסי כהן',     photoURL: null, emailVerified: true  },
-  { uid: 'sm-001',      email: 'sm@constrak.co.il',      password: 'sm123',     displayName: 'דנה לוי',      photoURL: null, emailVerified: true  },
-  { uid: 'sub-001',     email: 'sub@constrak.co.il',     password: 'sub123',    displayName: 'דוד כהן',      photoURL: null, emailVerified: true  },
-  { uid: 'worker-001',  email: 'worker@constrak.co.il',  password: 'worker123', displayName: 'גבי מזרחי',    photoURL: null, emailVerified: true  },
+  { uid: ADMIN_UID, email: 'admin@constrak.co.il', password: 'Admin1234', displayName: 'מנהל מערכת', photoURL: null, emailVerified: true },
 ];
 
-export const DEMO_CREDENTIALS = { email: 'demo@constrak.co.il', password: 'demo123' };
+// UIDs from the old demo dataset — purged automatically from legacy localStorage
+const LEGACY_DEMO_UIDS = new Set([
+  'demo-001', 'pm-001', 'sm-001', 'sub-001', 'worker-001',
+  'google-mock-001', 'facebook-mock-001',
+]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
@@ -23,10 +24,11 @@ function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function getAllUsers() {
   try {
     const extra = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    // Extras take precedence (supports password-reset overrides for seed users)
-    const extraUids = new Set(extra.map(u => u.uid));
-    const seeds = SEED_USERS.filter(s => !extraUids.has(s.uid));
-    return [...seeds, ...extra];
+    // Strip legacy demo entries; extras take precedence for admin password overrides
+    const cleanExtra = extra.filter(u => !LEGACY_DEMO_UIDS.has(u.uid));
+    const extraUids  = new Set(cleanExtra.map(u => u.uid));
+    const seeds      = SEED_USERS.filter(s => !extraUids.has(s.uid));
+    return [...seeds, ...cleanExtra];
   } catch {
     return [...SEED_USERS];
   }
