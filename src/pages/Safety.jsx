@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoles } from '../context/RolesContext';
 import {
   loadSafetyData, saveSafetyData, getActiveRules, getStaleWorkers,
-  SAFETY_PROJECTS,
 } from '../data/safetyStore';
+import { loadProjects } from '../data/projectsStore';
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function Safety() {
@@ -17,6 +17,13 @@ export default function Safety() {
   const [filterProject, setFilterProject] = useState('');
   const [filterWorker,  setFilterWorker]  = useState('');
   const [expandedId,    setExpandedId]    = useState(null);
+  const [projects,      setProjects]      = useState(() => loadProjects());
+
+  useEffect(() => {
+    function reloadProjects() { setProjects(loadProjects()); }
+    window.addEventListener('constrak:projects', reloadProjects);
+    return () => window.removeEventListener('constrak:projects', reloadProjects);
+  }, []);
 
   function refresh() { setData(loadSafetyData()); }
 
@@ -31,8 +38,8 @@ export default function Safety() {
     .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
 
   const availableProjects = currentRole === 'admin'
-    ? SAFETY_PROJECTS
-    : SAFETY_PROJECTS.filter(p => (currentSystemUser?.assignedProjects ?? []).includes(p.id));
+    ? projects
+    : projects.filter(p => (currentSystemUser?.assignedProjects ?? []).includes(p.id));
 
   const workerUsers = systemUsers.filter(u => u.role === 'worker' && u.status === 'active');
 
@@ -105,7 +112,7 @@ export default function Safety() {
           <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
             <select value={filterProject} onChange={e => setFilterProject(e.target.value)} style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: 'white', cursor: 'pointer', fontFamily: 'inherit' }}>
               <option value="">כל הפרויקטים</option>
-              {SAFETY_PROJECTS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {availableProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <input value={filterWorker} onChange={e => setFilterWorker(e.target.value)} placeholder="חפש שם עובד..." style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, flex: 1, fontFamily: 'inherit', outline: 'none' }} />
           </div>
@@ -120,7 +127,7 @@ export default function Safety() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {filteredBriefings.map(b => (
-                <BriefingCard key={b.id} briefing={b} expanded={expandedId === b.id} onToggle={() => setExpandedId(expandedId === b.id ? null : b.id)} currentVersion={data.rulesVersion} />
+                <BriefingCard key={b.id} briefing={b} expanded={expandedId === b.id} onToggle={() => setExpandedId(expandedId === b.id ? null : b.id)} currentVersion={data.rulesVersion} projects={projects} />
               ))}
             </div>
           )}
@@ -162,8 +169,8 @@ function StatCard({ icon, label, value, color }) {
 }
 
 // ── BriefingCard ──────────────────────────────────────────────────────────────
-function BriefingCard({ briefing: b, expanded, onToggle, currentVersion }) {
-  const projectName = SAFETY_PROJECTS.find(p => p.id === b.projectId)?.name ?? b.projectId;
+function BriefingCard({ briefing: b, expanded, onToggle, currentVersion, projects = [] }) {
+  const projectName = projects.find(p => p.id === b.projectId)?.name ?? b.projectId;
   const isStale     = (b.rulesVersion ?? 0) < (currentVersion ?? 1);
   const signedDate  = new Date(b.signedAt).toLocaleDateString('he-IL', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 

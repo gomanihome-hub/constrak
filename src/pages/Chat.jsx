@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { useRoles } from '../context/RolesContext';
 import {
   loadChatData, saveChatData, ensureProjectRoom, ensureDirectRoom,
-  createGroupRoom, addChatMessage, markChatRead, getUnreadCount, CHAT_PROJECTS,
+  createGroupRoom, addChatMessage, markChatRead, getUnreadCount,
 } from '../data/chatStore';
+import { loadProjects } from '../data/projectsStore';
 
 const ROLE_ICONS  = { admin: '👑', project_manager: '📊', site_manager: '🦺', subcontractor: '🔨', worker: '👷' };
 const ROLE_LABELS = { admin: 'מנהל מערכת', project_manager: 'מנהל פרויקט', site_manager: 'מנהל עבודה', subcontractor: 'קבלן משנה', worker: 'פועל' };
@@ -21,6 +22,7 @@ export default function Chat() {
   const [showNewDM,           setShowNewDM]           = useState(false);
   const [showNewProjectGroup, setShowNewProjectGroup] = useState(false);
   const [showNewGroup,        setShowNewGroup]        = useState(false);
+  const [projects,            setProjects]            = useState(() => loadProjects());
 
   useEffect(() => {
     function reload() { setChatData(loadChatData()); }
@@ -28,18 +30,24 @@ export default function Chat() {
     return () => window.removeEventListener('constrak:chat', reload);
   }, []);
 
+  useEffect(() => {
+    function reloadProjects() { setProjects(loadProjects()); }
+    window.addEventListener('constrak:projects', reloadProjects);
+    return () => window.removeEventListener('constrak:projects', reloadProjects);
+  }, []);
+
   // Seed / ensure auto project rooms for this user
   useEffect(() => {
     if (!uid) return;
     const data = loadChatData();
     const assignedIds = currentSystemUser?.assignedProjects ?? [];
-    const projects = currentRole === 'admin' ? CHAT_PROJECTS : CHAT_PROJECTS.filter(p => assignedIds.includes(p.id));
+    const userProjects = currentRole === 'admin' ? projects : projects.filter(p => assignedIds.includes(p.id));
     let changed = false;
-    for (const p of projects) {
+    for (const p of userProjects) {
       if (!data.rooms[`room-project-${p.id}`]) { ensureProjectRoom(data, p.id, p.name); changed = true; }
     }
     if (changed) { saveChatData(data); setChatData(loadChatData()); }
-  }, [uid, currentRole, currentSystemUser]);
+  }, [uid, currentRole, currentSystemUser, projects]);
 
   const visibleRooms = useMemo(() => {
     const assignedIds = currentSystemUser?.assignedProjects ?? [];
@@ -63,8 +71,8 @@ export default function Chat() {
   const activeRoomObj  = activeRoom ? chatData.rooms[activeRoom] : null;
 
   const availableProjects = currentRole === 'admin'
-    ? CHAT_PROJECTS
-    : CHAT_PROJECTS.filter(p => (currentSystemUser?.assignedProjects ?? []).includes(p.id));
+    ? projects
+    : projects.filter(p => (currentSystemUser?.assignedProjects ?? []).includes(p.id));
 
   // ── Room open ────────────────────────────────────────────────────────────────
   function openRoom(roomId) {

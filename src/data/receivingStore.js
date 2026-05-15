@@ -1,7 +1,5 @@
 const RECEIVING_KEY = 'constrak_receiving';
 
-export const RECEIVING_PROJECTS = [];
-
 export const UNIT_OPTIONS = [
   "יח'", 'מ"ק', 'טון', 'מ"ר', 'מטר', 'ליטר',
   "שק 25ק\"ג", "שק 40ק\"ג", "קרטון 12 יח'", "אלף יח'",
@@ -17,18 +15,13 @@ export function generateOrderId(orders) {
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
-// Legacy IDs from the old seed data — filter them out of any existing localStorage
-// so users who ran the app before this change don't see old demo orders/receipts.
-const LEGACY_ORDER_IDS   = new Set(['PO-2026-001','PO-2026-002','PO-2026-003','PO-2026-004','PO-2026-005']);
-const LEGACY_RECEIPT_IDS = new Set(['REC-2026-001','REC-2026-002','REC-2026-003']);
-
 export function loadReceiving() {
   try {
     const stored = JSON.parse(localStorage.getItem(RECEIVING_KEY) || 'null');
     if (!stored) return { orders: [], receipts: [] };
     return {
-      orders:   (stored.orders   ?? []).filter(o => !LEGACY_ORDER_IDS.has(o.id)),
-      receipts: (stored.receipts ?? []).filter(r => !LEGACY_RECEIPT_IDS.has(r.id)),
+      orders:   stored.orders   ?? [],
+      receipts: stored.receipts ?? [],
     };
   } catch {
     return { orders: [], receipts: [] };
@@ -89,13 +82,9 @@ export const SUPPLIER_CATEGORIES = [
 
 const SUPPLIERS_STORE_KEY = 'constrak_suppliers_v2';
 
-const LEGACY_SUPPLIER_IDS = new Set(['sup-1','sup-2','sup-3','sup-4','sup-5']);
-
 export function loadSuppliers() {
   try {
-    const stored = JSON.parse(localStorage.getItem(SUPPLIERS_STORE_KEY) || 'null');
-    if (!stored) return [];
-    return stored.filter(s => !LEGACY_SUPPLIER_IDS.has(s.id));
+    return JSON.parse(localStorage.getItem(SUPPLIERS_STORE_KEY) || 'null') ?? [];
   } catch {
     return [];
   }
@@ -120,16 +109,9 @@ export const CATALOG_CATEGORIES = [
 
 const CATALOG_STORE_KEY = 'constrak_catalog_v1';
 
-const LEGACY_CATALOG_IDS = new Set([
-  'cat-001','cat-002','cat-003','cat-004','cat-005','cat-006','cat-007','cat-008',
-  'cat-009','cat-010','cat-011','cat-012','cat-013','cat-014','cat-015',
-]);
-
 export function loadCatalog() {
   try {
-    const stored = JSON.parse(localStorage.getItem(CATALOG_STORE_KEY) || 'null');
-    if (!stored) return [];
-    return stored.filter(c => !LEGACY_CATALOG_IDS.has(c.id));
+    return JSON.parse(localStorage.getItem(CATALOG_STORE_KEY) || 'null') ?? [];
   } catch {
     return [];
   }

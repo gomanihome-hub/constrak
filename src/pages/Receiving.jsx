@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRoles } from '../context/RolesContext';
 import {
-  loadReceiving, saveReceiving, RECEIVING_PROJECTS,
+  loadReceiving, saveReceiving,
   UNIT_OPTIONS, generateOrderId,
   getOrderStatus, getReceivedQtyForItem, fmtDate, fmtDateTime,
   loadSuppliers, loadCatalog, CATALOG_CATEGORIES,
 } from '../data/receivingStore';
+import { loadProjects } from '../data/projectsStore';
 import SuppliersTab from '../components/SuppliersTab';
 import MaterialsTab from '../components/MaterialsTab';
 
@@ -715,7 +716,7 @@ function WizardShell({ title, step, steps, children, onClose, onBack, onNext, ne
 }
 
 // ─── NewOrderModal ────────────────────────────────────────────────────────────
-function NewOrderModal({ onClose, onSave, orders }) {
+function NewOrderModal({ onClose, onSave, orders, projects }) {
   const today = new Date().toISOString().slice(0, 10);
   const [orderId,          setOrderId]    = useState(() => generateOrderId(orders));
   const [supplier,         setSupplier]   = useState('');
@@ -746,7 +747,7 @@ function NewOrderModal({ onClose, onSave, orders }) {
     } : r));
   }
 
-  const projectName = RECEIVING_PROJECTS.find(p => p.id === projectId)?.name ?? '';
+  const projectName = projects.find(p => p.id === projectId)?.name ?? '';
 
   const totalValue = items.reduce((sum, it) => {
     return sum + (Number(it.orderedQty) || 0) * (Number(it.unitPrice) || 0);
@@ -828,7 +829,7 @@ function NewOrderModal({ onClose, onSave, orders }) {
             <FormField label="פרויקט" required error={errors.project}>
               <select value={projectId} onChange={e => setProjId(e.target.value)} style={iStyle()}>
                 <option value="">— בחר פרויקט —</option>
-                {RECEIVING_PROJECTS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </FormField>
           </div>
@@ -1133,11 +1134,18 @@ export default function Receiving() {
   const uid      = currentSystemUser?.id ?? '';
   const uname    = currentSystemUser?.displayName ?? 'משתמש';
   const assigned = getAssignedProjectIds();
+  const [projects, setProjects] = useState(() => loadProjects());
 
   useEffect(() => {
     function refresh() { setData(loadReceiving()); }
     window.addEventListener('constrak:receiving', refresh);
     return () => window.removeEventListener('constrak:receiving', refresh);
+  }, []);
+
+  useEffect(() => {
+    function reloadProjects() { setProjects(loadProjects()); }
+    window.addEventListener('constrak:projects', reloadProjects);
+    return () => window.removeEventListener('constrak:projects', reloadProjects);
   }, []);
 
   function handleSaveReceipt(receipt) {
@@ -1260,7 +1268,7 @@ export default function Receiving() {
         <select value={filterProject} onChange={e => setFP(e.target.value)}
           style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 11px', fontSize: 13, outline: 'none', background: 'white' }}>
           <option value="">כל הפרויקטים</option>
-          {RECEIVING_PROJECTS.filter(p => !assigned || assigned.includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {projects.filter(p => !assigned || assigned.includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
 
         {tab === 'receipts' && (
@@ -1351,6 +1359,7 @@ export default function Receiving() {
           onClose={() => setShowNewOrder(false)}
           onSave={handleSaveOrder}
           orders={data.orders}
+          projects={projects}
         />
       )}
       {showWizard && (

@@ -5,8 +5,9 @@ import { loadTasks, saveTasks, PRIORITY, STATUS } from '../data/tasksStore';
 import { loadMsgs, saveMsgs, isVisibleTo, markRead, roleLabel } from '../data/messagesStore';
 import {
   loadChatData, saveChatData, ensureProjectRoom, addChatMessage,
-  markChatRead, getUnreadCount, CHAT_PROJECTS,
+  markChatRead, getUnreadCount,
 } from '../data/chatStore';
+import { loadProjects } from '../data/projectsStore';
 
 // ── Worker daily-report storage ───────────────────────────────────────────────
 const REPORTS_KEY = 'constrak_worker_reports';
@@ -591,7 +592,7 @@ function TabChat({ uid, displayName, currentRole, assignedProjects, chatData, se
     const data = loadChatData();
     let changed = false;
     for (const pid of assignedProjects) {
-      const proj = CHAT_PROJECTS.find(p => p.id === pid);
+      const proj = loadProjects().find(p => p.id === pid);
       if (proj && !data.rooms[`room-project-${pid}`]) {
         ensureProjectRoom(data, pid, proj.name);
         changed = true;

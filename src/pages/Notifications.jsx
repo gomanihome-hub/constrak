@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useRoles } from '../context/RolesContext';
 import {
-  loadAlerts, saveAlerts, ALERT_PROJECTS, ALERT_TYPE_INFO, DEFAULT_SETTINGS,
+  loadAlerts, saveAlerts, ALERT_TYPE_INFO, DEFAULT_SETTINGS,
 } from '../data/alertsStore';
+import { loadProjects } from '../data/projectsStore';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso) {
@@ -167,7 +168,7 @@ function SettingsTab({ settings, onSave, canConfigure }) {
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>הגדרות לפי פרויקט</h3>
         </div>
         <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {ALERT_PROJECTS.map((project, pi) => {
+          {projects.map((project, pi) => {
             const ps = form.projects?.[project.id] ?? DEFAULT_SETTINGS.projects[project.id];
             const projColors = ['#3b82f6','#8b5cf6','#22c55e'];
             const projIcons  = ['🏙️','🏬','🏡'];
@@ -268,12 +269,19 @@ export default function Notifications() {
 
   const uid = currentSystemUser?.id ?? '';
   const canConfigure = can.sendBroadcast; // admin or pm
+  const [projects, setProjects] = useState(() => loadProjects());
 
   // Live reload when engine fires
   useEffect(() => {
     function refresh() { setAlertsData(loadAlerts()); }
     window.addEventListener('constrak:alerts', refresh);
     return () => window.removeEventListener('constrak:alerts', refresh);
+  }, []);
+
+  useEffect(() => {
+    function reloadProjects() { setProjects(loadProjects()); }
+    window.addEventListener('constrak:projects', reloadProjects);
+    return () => window.removeEventListener('constrak:projects', reloadProjects);
   }, []);
 
   function markRead(notifId) {
@@ -407,7 +415,7 @@ export default function Notifications() {
             <select value={filterProject} onChange={e => setFP(e.target.value)}
               style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 11px', fontSize: 13, outline: 'none', background: 'white' }}>
               <option value="">כל הפרויקטים</option>
-              {ALERT_PROJECTS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <select value={filterType} onChange={e => setFT(e.target.value)}
               style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 11px', fontSize: 13, outline: 'none', background: 'white' }}>

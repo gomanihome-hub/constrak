@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRoles } from '../context/RolesContext';
 import {
-  loadDocs, saveDocs, DOC_PROJECTS, DOC_CATEGORIES,
+  loadDocs, saveDocs, DOC_CATEGORIES,
   getCategoryInfo, fmtDocSize, mimeIcon, mimeLabel,
 } from '../data/documentsStore';
+import { loadProjects } from '../data/projectsStore';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso) {
@@ -747,11 +748,19 @@ export default function Documents() {
   const canManage   = can.manageUsers || can.viewDashboard; // admin, pm, sm
   const canUpload   = canManage;
 
+  const [projects, setProjects] = useState(() => loadProjects());
+
   // Reload on storage event (cross-tab)
   useEffect(() => {
     function onDocs() { setDocsData(loadDocs()); }
     window.addEventListener('constrak:docs', onDocs);
     return () => window.removeEventListener('constrak:docs', onDocs);
+  }, []);
+
+  useEffect(() => {
+    function reloadProjects() { setProjects(loadProjects()); }
+    window.addEventListener('constrak:projects', reloadProjects);
+    return () => window.removeEventListener('constrak:projects', reloadProjects);
   }, []);
 
   // Sync activeDoc when docsData changes
@@ -763,9 +772,9 @@ export default function Documents() {
   }, [docsData]);
 
   const visibleProjects = useMemo(() => {
-    if (!assignedIds) return DOC_PROJECTS;
-    return DOC_PROJECTS.filter(p => assignedIds.includes(p.id));
-  }, [assignedIds]);
+    if (!assignedIds) return projects;
+    return projects.filter(p => assignedIds.includes(p.id));
+  }, [assignedIds, projects]);
 
   const filtered = useMemo(() => {
     let docs = docsData.documents.filter(d => {
@@ -929,7 +938,7 @@ export default function Documents() {
       {/* Modals */}
       {showUpload && (
         <UploadModal onClose={() => setShowUpload(false)} onUpload={handleUpload}
-          projects={DOC_PROJECTS} existingDocs={docsData.documents}
+          projects={projects} existingDocs={docsData.documents}
           currentUserId={uid} currentUserName={uname}
           assignedProjectIds={assignedIds} />
       )}

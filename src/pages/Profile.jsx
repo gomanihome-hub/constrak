@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth, firebaseErrorToHebrew } from '../context/AuthContext';
 import { useRoles, ROLES } from '../context/RolesContext';
-import { DOC_PROJECTS } from '../data/documentsStore';
+import { loadProjects } from '../data/projectsStore';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function fmtDateTime(iso) {
@@ -132,9 +132,10 @@ export default function Profile({ setActivePage }) {
 
   const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const assignedIds   = getAssignedProjectIds();
+  const allProjects   = loadProjects();
   const assignedProjects = assignedIds === null
-    ? DOC_PROJECTS
-    : DOC_PROJECTS.filter(p => assignedIds.includes(p.id));
+    ? allProjects
+    : allProjects.filter(p => assignedIds.includes(p.id));
 
   function showToast(message, type = 'success') {
     setToast({ message, type });
