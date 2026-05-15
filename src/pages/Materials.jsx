@@ -91,18 +91,21 @@ export default function Materials() {
     ...calcStats(item.catalogNum, orders, receipts),
   })), [catalog, orders, receipts]);
 
-  // Filter
-  const filtered = useMemo(() => rows.filter(r => {
+  // Only show materials that have at least one purchase order
+  const orderedRows = useMemo(() => rows.filter(r => r.totalOrderedQty > 0), [rows]);
+
+  // Apply search + category filter on top
+  const filtered = useMemo(() => orderedRows.filter(r => {
     const matchSearch = !search ||
       r.name.includes(search) ||
       (r.catalogNum ?? '').toLowerCase().includes(search.toLowerCase());
     const matchCat = catFilter === 'all' || r.category === catFilter;
     return matchSearch && matchCat;
-  }), [rows, search, catFilter]);
+  }), [orderedRows, search, catFilter]);
 
-  const grandTotalQty   = rows.reduce((s, r) => s + r.totalOrderedQty, 0);
-  const grandTotalCost  = rows.reduce((s, r) => s + r.totalCost, 0);
-  const itemsWithOrders = rows.filter(r => r.totalOrderedQty > 0).length;
+  const grandTotalQty   = orderedRows.reduce((s, r) => s + r.totalOrderedQty, 0);
+  const grandTotalCost  = orderedRows.reduce((s, r) => s + r.totalCost, 0);
+  const itemsWithOrders = orderedRows.length;
 
   // ── Summary cards ────────────────────────────────────────────────────────────
   return (
@@ -240,15 +243,12 @@ export default function Materials() {
         </div>
       </div>
 
-      {/* Explanation note */}
-      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <span style={{ fontSize: 16, flexShrink: 0 }}>💡</span>
-        <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
-          <strong>אופן חישוב עלות יחידה ממוצעת:</strong> ממוצע משוקלל לפי <em>כמות שהתקבלה בפועל</em> —
-          סך (כמות שהתקבלה × מחיר יחידה מהזמנה) ÷ סך כמויות שהתקבלו עם מחיר.
-          {' '}<strong>עלות כוללת</strong> = כמות שהוזמנה × המחיר הממוצע שהתקבל.
-          {' '}<span style={{ color: '#b45309' }}>חומר שהוזמן ועדיין לא התקבל מוצג כ"טרם התקבל".</span>
-        </div>
+      {/* Footer note */}
+      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center' }}>
+        <span style={{ fontSize: 15, flexShrink: 0 }}>ℹ️</span>
+        <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+          מציג רק חומרים שהוזמנו. לצפייה בקטלוג המלא עבור ל<strong>קבלת חומרים</strong>.
+        </p>
       </div>
     </div>
   );
