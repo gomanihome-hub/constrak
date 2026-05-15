@@ -95,8 +95,8 @@ function MaterialModal({ item, catalog, onClose, onSave }) {
             <FormField label="שם החומר" required error={errors.name}>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="שם החומר..." style={iStyle()} />
             </FormField>
-            <FormField label="מק&quot;ט / מספר קטלוג">
-              <input value={catalogNum} onChange={e => setCatalogNum(e.target.value)} placeholder="נוצר אוטומטית..." style={iStyle()} />
+            <FormField label='מק"ט'>
+              <input value={catalogNum} onChange={e => setCatalogNum(e.target.value)} placeholder="לדוגמה: BT-030, IR-012..." style={iStyle({ fontFamily: 'monospace' })} />
             </FormField>
           </div>
 

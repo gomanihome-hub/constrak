@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRoles } from '../context/RolesContext';
+import { APPROVAL_CHAIN, APPROVAL_STATUS_INFO, CHAIN_ROLE_LABELS } from '../data/reportApprovalStore';
 
 const STORE_KEY = 'constrak_sub_reports';
 const STATUS_OPTIONS = [
@@ -50,13 +51,22 @@ export default function MyReport() {
   function handleSubmit(e) {
     e.preventDefault();
     if (!form.workDescription.trim()) { showToast('נא למלא תיאור עבודה'); return; }
+    const userId = currentSystemUser?.id ?? user?.uid;
     const report = {
       id: `rep-${Date.now()}`,
-      userId: currentSystemUser?.id ?? user?.uid,
+      userId,
       displayName,
       trade,
       ...form,
       submittedAt: new Date().toISOString(),
+      approvalStatus: 'pending',
+      signatures: [{
+        role: 'subcontractor',
+        userId,
+        displayName,
+        signedAt: new Date().toISOString(),
+        notes: '',
+      }],
     };
     const updated = [...reports, report];
     setReports(updated);
@@ -235,24 +245,51 @@ export default function MyReport() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {myReports.map(report => {
                 const s = STATUS_OPTIONS.find(o => o.value === report.status);
+                const aInfo = APPROVAL_STATUS_INFO[report.approvalStatus] ?? APPROVAL_STATUS_INFO.draft;
+                const signedRoles = new Set((report.signatures || []).map(sig => sig.role));
                 return (
-                  <div key={report.id} style={{ background: 'white', borderRadius: 12, padding: '14px 16px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
-                          {new Date(report.date).toLocaleDateString('he-IL', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        </span>
-                        {s && (
-                          <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color }}>
-                            {s.label}
+                  <div key={report.id} style={{ background: 'white', borderRadius: 12, padding: '14px 16px', border: `1px solid ${aInfo.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                            {new Date(report.date).toLocaleDateString('he-IL', { weekday: 'short', month: 'short', day: 'numeric' })}
                           </span>
-                        )}
+                          {s && (
+                            <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color }}>
+                              {s.label}
+                            </span>
+                          )}
+                          <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: aInfo.bg, color: aInfo.color, border: `1px solid ${aInfo.border}` }}>
+                            {aInfo.icon} {aInfo.label}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, color: '#64748b', lineHeight: 1.4 }}>{report.workDescription}</p>
                       </div>
-                      <p style={{ margin: 0, fontSize: 13, color: '#64748b', lineHeight: 1.4 }}>{report.workDescription}</p>
+                      <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>
+                        {new Date(report.submittedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
-                    <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>
-                      {new Date(report.submittedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    {/* Approval chain progress */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
+                      {APPROVAL_CHAIN.map((role, i) => {
+                        const sig = (report.signatures || []).find(s => s.role === role);
+                        const isSigned = !!sig;
+                        return (
+                          <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                            <div title={sig ? `אושר ב-${new Date(sig.signedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}` : ''} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                              <span style={{ fontSize: 14 }}>{isSigned ? '✅' : '○'}</span>
+                              <span style={{ fontSize: 9, color: isSigned ? '#16a34a' : '#94a3b8', fontWeight: isSigned ? 700 : 400, whiteSpace: 'nowrap' }}>
+                                {CHAIN_ROLE_LABELS[role]}
+                              </span>
+                            </div>
+                            {i < APPROVAL_CHAIN.length - 1 && (
+                              <span style={{ color: '#cbd5e1', fontSize: 12, marginBottom: 14 }}>←</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}

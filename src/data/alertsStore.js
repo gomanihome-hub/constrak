@@ -16,8 +16,9 @@ const PROJECT_NAME_TO_ID = {
 };
 
 export const ALERT_TYPE_INFO = {
-  missing_day_plan: { label: 'תכנון יומי חסר',   icon: '🌅', color: '#d97706', bg: '#fef3c7', border: '#fde68a' },
-  missing_work_log: { label: 'דוח עבודה חסר',     icon: '📋', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+  missing_day_plan: { label: 'תכנון יומי חסר',       icon: '🌅', color: '#d97706', bg: '#fef3c7', border: '#fde68a' },
+  missing_work_log: { label: 'דוח עבודה חסר',         icon: '📋', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+  report_approval:  { label: 'דוח ממתין לאישורך',     icon: '✍️', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
 };
 
 export const DEFAULT_SETTINGS = {

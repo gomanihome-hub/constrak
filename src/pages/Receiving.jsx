@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRoles } from '../context/RolesContext';
 import {
-  loadReceiving, saveReceiving, RECEIVING_PROJECTS, SUPPLIERS,
+  loadReceiving, saveReceiving, RECEIVING_PROJECTS,
   UNIT_OPTIONS, generateOrderId,
   getOrderStatus, getReceivedQtyForItem, fmtDate, fmtDateTime,
+  loadSuppliers, loadCatalog, CATALOG_CATEGORIES,
 } from '../data/receivingStore';
 import SuppliersTab from '../components/SuppliersTab';
 import MaterialsTab from '../components/MaterialsTab';
@@ -723,29 +724,27 @@ function NewOrderModal({ onClose, onSave, orders }) {
   const [orderDate,        setOrderDate]  = useState(today);
   const [expectedDelivery, setExpDel]     = useState('');
   const [notes,            setNotes]      = useState('');
-  const [items,            setItems]      = useState([newRow()]);
+  const [items,            setItems]      = useState(() => [newRow()]);
   const [errors,           setErrors]     = useState({});
-  const [showSugg,         setShowSugg]   = useState(false);
   const [saved,            setSaved]      = useState(false);
-  const suppRef = useRef(null);
+  const [suppList,         setSuppList]   = useState(() => loadSuppliers());
+  const [catalog,          setCatalogList] = useState(() => loadCatalog());
 
   function newRow() {
-    return { _id: Math.random().toString(36).slice(2), name: '', unit: "יח'", orderedQty: 1, unitPrice: '' };
-  }
-
-  const suppMatches = supplier
-    ? SUPPLIERS.filter(s => s.name.includes(supplier)).slice(0, 5)
-    : [];
-
-  function pickSupplier(s) {
-    setSupplier(s.name);
-    setSuppPhone(s.phone);
-    setShowSugg(false);
+    return { _id: Math.random().toString(36).slice(2), name: '', catalogNum: '', unit: "יח'", orderedQty: 1, unitPrice: '' };
   }
 
   function addRow()               { setItems(prev => [...prev, newRow()]); }
   function removeRow(idx)         { setItems(prev => prev.filter((_, i) => i !== idx)); }
   function updateRow(idx, k, v)   { setItems(prev => prev.map((r, i) => i === idx ? { ...r, [k]: v } : r)); }
+  function updateItemName(idx, name) {
+    const catItem = catalog.find(c => c.name === name);
+    setItems(prev => prev.map((r, i) => i === idx ? {
+      ...r, name,
+      catalogNum: catItem?.catalogNum ?? '',
+      unit: catItem?.unit ?? r.unit,
+    } : r));
+  }
 
   const projectName = RECEIVING_PROJECTS.find(p => p.id === projectId)?.name ?? '';
 
@@ -782,7 +781,7 @@ function NewOrderModal({ onClose, onSave, orders }) {
         unit:       it.unit,
         orderedQty: Number(it.orderedQty),
         unitPrice:  it.unitPrice !== '' ? Number(it.unitPrice) : null,
-        catalogNum: '',
+        catalogNum: it.catalogNum || '',
       })),
     };
     onSave(order);
@@ -837,27 +836,26 @@ function NewOrderModal({ onClose, onSave, orders }) {
           {/* Row 2: Supplier + phone */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: 14, alignItems: 'start' }}>
             <FormField label="ספק" required error={errors.supplier}>
-              <div style={{ position: 'relative' }} ref={suppRef}>
-                <input value={supplier}
-                  onChange={e => { setSupplier(e.target.value); setShowSugg(true); }}
-                  onFocus={() => setShowSugg(true)}
-                  onBlur={() => setTimeout(() => setShowSugg(false), 150)}
-                  placeholder="שם הספק..."
-                  style={iStyle()} />
-                {showSugg && suppMatches.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', right: 0, left: 0, background: 'white', border: `1.5px solid ${TEAL}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, overflow: 'hidden', marginTop: 2 }}>
-                    {suppMatches.map(s => (
-                      <div key={s.id} onMouseDown={() => pickSupplier(s)}
-                        style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                        <span style={{ fontWeight: 600 }}>{s.name}</span>
-                        <span style={{ color: '#94a3b8', fontSize: 11 }}>{s.phone}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {suppList.length === 0 ? (
+                <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 9, fontSize: 13, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  ⚠️ אין ספקים מאושרים — הוסף ספק תחילה
+                </div>
+              ) : (
+                <select
+                  value={supplier}
+                  onChange={e => {
+                    const s = suppList.find(s => s.name === e.target.value);
+                    setSupplier(e.target.value);
+                    setSuppPhone(s?.phone ?? '');
+                  }}
+                  style={iStyle()}
+                >
+                  <option value="">— בחר ספק —</option>
+                  {suppList.map(s => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              )}
             </FormField>
             <FormField label="טלפון ספק">
               <input value={supplierPhone} onChange={e => setSuppPhone(e.target.value)}
@@ -892,8 +890,9 @@ function NewOrderModal({ onClose, onSave, orders }) {
 
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
               {/* Table header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 120px 72px 130px 90px 28px', gap: 8, padding: '8px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 11, fontWeight: 700, color: '#64748b' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 88px 110px 68px 110px 76px 28px', gap: 8, padding: '8px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 11, fontWeight: 700, color: '#64748b' }}>
                 <span>שם פריט</span>
+                <span>מק"ט</span>
                 <span>יחידה</span>
                 <span>כמות</span>
                 <span>מחיר יחידה (₪)</span>
@@ -901,32 +900,65 @@ function NewOrderModal({ onClose, onSave, orders }) {
                 <span />
               </div>
 
+              {catalog.length === 0 && (
+                <div style={{ padding: '10px 14px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 12, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ⚠️ קטלוג החומרים ריק — הוסף חומרים תחילה בלשונית "קטלוג חומרים"
+                </div>
+              )}
+
               {items.map((item, idx) => {
                 const lineTotal = (Number(item.orderedQty) || 0) * (Number(item.unitPrice) || 0);
                 return (
-                  <div key={item._id} style={{ display: 'grid', gridTemplateColumns: '2fr 120px 72px 130px 90px 28px', gap: 8, padding: '8px 12px', borderBottom: idx < items.length - 1 ? '1px solid #f1f5f9' : 'none', background: idx % 2 ? '#fafafa' : 'white', alignItems: 'center' }}>
-                    <input value={item.name} onChange={e => updateRow(idx, 'name', e.target.value)}
-                      placeholder="שם הפריט..."
-                      style={{ border: '1px solid #e2e8f0', borderRadius: 7, padding: '6px 9px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box', direction: 'rtl', fontFamily: 'inherit' }} />
+                  <div key={item._id} style={{ display: 'grid', gridTemplateColumns: '2fr 88px 110px 68px 110px 76px 28px', gap: 8, padding: '8px 12px', borderBottom: idx < items.length - 1 ? '1px solid #f1f5f9' : 'none', background: idx % 2 ? '#fafafa' : 'white', alignItems: 'center' }}>
 
+                    {/* Item name — dropdown from catalog */}
+                    <select
+                      value={item.name}
+                      onChange={e => updateItemName(idx, e.target.value)}
+                      style={{ border: `1px solid ${item.name ? TEAL : '#e2e8f0'}`, borderRadius: 7, padding: '6px 8px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box', direction: 'rtl', fontFamily: 'inherit', background: 'white', color: item.name ? '#1e293b' : '#94a3b8' }}
+                    >
+                      <option value="">— בחר פריט —</option>
+                      {CATALOG_CATEGORIES.map(cat => {
+                        const catItems = catalog.filter(c => c.category === cat.id);
+                        if (catItems.length === 0) return null;
+                        return (
+                          <optgroup key={cat.id} label={`${cat.icon} ${cat.label}`}>
+                            {catItems.map(c => (
+                              <option key={c.id} value={c.name}>{c.name}</option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
+                    </select>
+
+                    {/* מק"ט — auto-filled, read-only */}
+                    <div style={{ fontSize: 11, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: item.catalogNum ? '#f0f9ff' : '#f8fafc', border: `1px solid ${item.catalogNum ? '#bae6fd' : '#e2e8f0'}`, borderRadius: 7, padding: '7px 8px', color: item.catalogNum ? '#0369a1' : '#cbd5e1', fontWeight: item.catalogNum ? 700 : 400 }}>
+                      {item.catalogNum || '—'}
+                    </div>
+
+                    {/* Unit */}
                     <select value={item.unit} onChange={e => updateRow(idx, 'unit', e.target.value)}
                       style={{ border: '1px solid #e2e8f0', borderRadius: 7, padding: '6px 8px', fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box', background: 'white', direction: 'rtl', fontFamily: 'inherit' }}>
                       {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
 
+                    {/* Qty */}
                     <input type="number" min={0} step="any" value={item.orderedQty}
                       onChange={e => updateRow(idx, 'orderedQty', e.target.value)}
                       style={{ border: '1px solid #e2e8f0', borderRadius: 7, padding: '6px 6px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box', textAlign: 'center' }} />
 
+                    {/* Unit price */}
                     <input type="number" min={0} step="any" value={item.unitPrice}
                       onChange={e => updateRow(idx, 'unitPrice', e.target.value)}
                       placeholder="0"
                       style={{ border: '1px solid #e2e8f0', borderRadius: 7, padding: '6px 9px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box', direction: 'ltr' }} />
 
-                    <span style={{ fontSize: 13, fontWeight: 700, color: lineTotal > 0 ? '#1e293b' : '#cbd5e1', textAlign: 'center' }}>
+                    {/* Line total */}
+                    <span style={{ fontSize: 12, fontWeight: 700, color: lineTotal > 0 ? '#1e293b' : '#cbd5e1', textAlign: 'center' }}>
                       {lineTotal > 0 ? `₪${lineTotal.toLocaleString('he-IL')}` : '—'}
                     </span>
 
+                    {/* Delete */}
                     <button onClick={() => removeRow(idx)} disabled={items.length === 1}
                       style={{ background: 'transparent', border: 'none', cursor: items.length === 1 ? 'not-allowed' : 'pointer', color: items.length === 1 ? '#cbd5e1' : '#ef4444', fontSize: 18, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
                       ×
@@ -937,9 +969,9 @@ function NewOrderModal({ onClose, onSave, orders }) {
 
               {/* Total row */}
               {totalValue > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 120px 72px 130px 90px 28px', gap: 8, padding: '9px 12px', background: '#eff6ff', borderTop: '2px solid #bfdbfe', fontSize: 13, fontWeight: 700 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 88px 110px 68px 110px 76px 28px', gap: 8, padding: '9px 12px', background: '#eff6ff', borderTop: '2px solid #bfdbfe', fontSize: 13, fontWeight: 700 }}>
                   <span style={{ color: '#1e293b' }}>סה"כ הזמנה</span>
-                  <span /><span /><span />
+                  <span /><span /><span /><span />
                   <span style={{ color: '#1d4ed8', textAlign: 'center' }}>₪{totalValue.toLocaleString('he-IL')}</span>
                   <span />
                 </div>
