@@ -91,21 +91,21 @@ export default function Materials() {
     ...calcStats(item.catalogNum, orders, receipts),
   })), [catalog, orders, receipts]);
 
-  // Only show materials that have at least one purchase order
-  const orderedRows = useMemo(() => rows.filter(r => r.totalOrderedQty > 0), [rows]);
+  // Only show materials that have been received with a known price (totalCost > 0)
+  const visibleRows = useMemo(() => rows.filter(r => r.totalCost > 0), [rows]);
 
   // Apply search + category filter on top
-  const filtered = useMemo(() => orderedRows.filter(r => {
+  const filtered = useMemo(() => visibleRows.filter(r => {
     const matchSearch = !search ||
       r.name.includes(search) ||
       (r.catalogNum ?? '').toLowerCase().includes(search.toLowerCase());
     const matchCat = catFilter === 'all' || r.category === catFilter;
     return matchSearch && matchCat;
-  }), [orderedRows, search, catFilter]);
+  }), [visibleRows, search, catFilter]);
 
-  const grandTotalQty   = orderedRows.reduce((s, r) => s + r.totalOrderedQty, 0);
-  const grandTotalCost  = orderedRows.reduce((s, r) => s + r.totalCost, 0);
-  const itemsWithOrders = orderedRows.length;
+  const grandTotalQty   = visibleRows.reduce((s, r) => s + r.totalOrderedQty, 0);
+  const grandTotalCost  = visibleRows.reduce((s, r) => s + r.totalCost, 0);
+  const itemsWithOrders = visibleRows.length;
 
   // ── Summary cards ────────────────────────────────────────────────────────────
   return (
