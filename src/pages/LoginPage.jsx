@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth, firebaseErrorToHebrew } from '../context/AuthContext';
+import ForgotPasswordModal from '../components/ForgotPasswordModal';
 
 const TEAL = '#80cded';
 const TEAL_DARK = '#4fb8e0';
@@ -37,6 +38,7 @@ export default function LoginPage({ onRegister }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading]   = useState(null); // null | 'email' | 'google' | 'facebook'
   const [error, setError]       = useState('');
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -132,7 +134,7 @@ export default function LoginPage({ onRegister }) {
 
             <div>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
-                <button type="button" style={{ fontSize:13, color:TEAL_DARK, background:'none', border:'none', cursor:'pointer', padding:0, fontWeight:500 }}>שכחתי סיסמה</button>
+                <button type="button" onClick={() => setForgotOpen(true)} style={{ fontSize:13, color:TEAL_DARK, background:'none', border:'none', cursor:'pointer', padding:0, fontWeight:500 }}>שכחתי סיסמה</button>
                 <label style={{ fontSize:13, fontWeight:600, color:'#374151' }}>סיסמה</label>
               </div>
               <div style={{ position:'relative' }}>
@@ -181,6 +183,13 @@ export default function LoginPage({ onRegister }) {
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {forgotOpen && (
+        <ForgotPasswordModal
+          onClose={() => setForgotOpen(false)}
+          onRegister={onRegister}
+        />
+      )}
     </div>
   );
 }

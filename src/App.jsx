@@ -3,6 +3,8 @@ import { useAuth } from './context/AuthContext';
 import { useRoles } from './context/RolesContext';
 import { runAlertEngine } from './data/alertsStore';
 import SplashScreen from './components/SplashScreen';
+import OnboardingTour, { hasCompletedOnboarding } from './components/OnboardingTour';
+import EmailVerificationBanner from './components/EmailVerificationBanner';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import Sidebar from './components/Sidebar';
@@ -50,8 +52,19 @@ export default function App() {
   const { user, authLoading } = useAuth();
   const { currentRole, can } = useRoles();
   const [splashDone, setSplashDone] = useState(false);
+  // true = onboarding has been dismissed for this session (skip) or permanently (complete)
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [authPage, setAuthPage] = useState('login');
   const [activePage, setActivePage] = useState('dashboard');
+
+  // Show onboarding when a user logs in and hasn't permanently completed it
+  useEffect(() => {
+    if (user) {
+      setOnboardingVisible(!hasCompletedOnboarding(user.uid));
+    } else {
+      setOnboardingVisible(false);
+    }
+  }, [user?.uid]);
 
   // Run alert engine on mount and every minute
   useEffect(() => {
@@ -79,14 +92,35 @@ export default function App() {
     return <LoginPage onLogin={() => {}} onRegister={() => setAuthPage('register')} />;
   }
 
+  // Show onboarding after first login — skip doesn't persist, complete does
+  if (onboardingVisible) {
+    return (
+      <OnboardingTour
+        userId={user.uid}
+        onSkip={() => setOnboardingVisible(false)}
+        onComplete={() => setOnboardingVisible(false)}
+      />
+    );
+  }
+
   // Worker: dedicated check-in view
   if (currentRole === 'worker') {
-    return <CheckIn />;
+    return (
+      <div dir="rtl">
+        <EmailVerificationBanner />
+        <CheckIn />
+      </div>
+    );
   }
 
   // Subcontractor: dedicated report view
   if (currentRole === 'subcontractor') {
-    return <MyReport />;
+    return (
+      <div dir="rtl">
+        <EmailVerificationBanner />
+        <MyReport />
+      </div>
+    );
   }
 
   // Full app for admin / project_manager / site_manager
@@ -96,6 +130,7 @@ export default function App() {
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <div className="flex-1 flex flex-col min-w-0">
         <Header activePage={activePage} setActivePage={setActivePage} />
+        <EmailVerificationBanner />
         <main className="flex-1 overflow-auto">
           <PageComponent setActivePage={setActivePage} />
         </main>

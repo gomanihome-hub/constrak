@@ -1,9 +1,16 @@
 import { createContext, useContext, useState } from 'react';
 
 // ─── Storage keys ────────────────────────────────────────────────────────────
-const SESSION_KEY    = 'constrak_auth_user';
-const USERS_KEY      = 'constrak_auth_users';
-const SYS_USERS_KEY  = 'constrak_system_users';
+const SESSION_KEY       = 'constrak_auth_user';
+const USERS_KEY         = 'constrak_auth_users';
+const SYS_USERS_KEY     = 'constrak_system_users';
+const VERIFY_TOKENS_KEY = 'constrak_verify_tokens';
+const RESET_TOKENS_KEY  = 'constrak_reset_tokens';
+
+// Sessions expire after 30 days of inactivity (reset on every auth action)
+const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+// Password-reset links expire after 1 hour
+const RESET_EXPIRY_MS   = 60 * 60 * 1000;
 
 // ─── Default admin account (always exists, cannot be removed) ────────────────
 export const ADMIN_UID = 'admin-001';
@@ -20,6 +27,51 @@ const LEGACY_DEMO_UIDS = new Set([
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+// ─── Email-verification token helpers ─────────────────────────────────────────
+function generateToken() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function storeVerifyToken(token, uid, email) {
+  try {
+    const tokens = JSON.parse(localStorage.getItem(VERIFY_TOKENS_KEY) || '{}');
+    tokens[token] = { uid, email };
+    localStorage.setItem(VERIFY_TOKENS_KEY, JSON.stringify(tokens));
+  } catch {}
+}
+
+// ─── Password-reset token helpers ─────────────────────────────────────────────
+function storeResetToken(token, uid, email) {
+  try {
+    const tokens = JSON.parse(localStorage.getItem(RESET_TOKENS_KEY) || '{}');
+    tokens[token] = { uid, email, expiresAt: Date.now() + RESET_EXPIRY_MS };
+    localStorage.setItem(RESET_TOKENS_KEY, JSON.stringify(tokens));
+  } catch {}
+}
+
+function consumeResetToken(token) {
+  try {
+    const tokens = JSON.parse(localStorage.getItem(RESET_TOKENS_KEY) || '{}');
+    const data = tokens[token];
+    if (!data) return null;
+    if (data.expiresAt && Date.now() > data.expiresAt) return null;
+    delete tokens[token];
+    localStorage.setItem(RESET_TOKENS_KEY, JSON.stringify(tokens));
+    return data;
+  } catch { return null; }
+}
+
+function consumeVerifyToken(token) {
+  try {
+    const tokens = JSON.parse(localStorage.getItem(VERIFY_TOKENS_KEY) || '{}');
+    const data = tokens[token];
+    if (!data) return null;
+    delete tokens[token];
+    localStorage.setItem(VERIFY_TOKENS_KEY, JSON.stringify(tokens));
+    return data;
+  } catch { return null; }
+}
 
 function getAllUsers() {
   try {
@@ -46,7 +98,13 @@ function registerUser(user) {
 
 function persistSession(user) {
   const { uid, email, displayName, photoURL, provider, emailVerified, lastLoginAt } = user;
-  const slim = { uid, email, displayName, photoURL, provider, emailVerified: emailVerified ?? false, lastLoginAt: lastLoginAt ?? null };
+  const now = new Date().toISOString();
+  const slim = {
+    uid, email, displayName, photoURL, provider,
+    emailVerified: emailVerified ?? false,
+    lastLoginAt: lastLoginAt ?? now,
+    expiresAt: Date.now() + SESSION_EXPIRY_MS,
+  };
   localStorage.setItem(SESSION_KEY, JSON.stringify(slim));
   return slim;
 }
@@ -54,7 +112,28 @@ function persistSession(user) {
 function readSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+
+    // Clear and reject expired sessions
+    if (session.expiresAt && Date.now() > session.expiresAt) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+
+    // Clear and reject sessions for deactivated users
+    try {
+      const sysData = JSON.parse(localStorage.getItem(SYS_USERS_KEY) || '[]');
+      const sysUser = sysData.find(
+        su => su.id === session.uid || su.email?.toLowerCase() === session.email?.toLowerCase()
+      );
+      if (sysUser?.status === 'inactive') {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+    } catch {}
+
+    return session;
   } catch {
     return null;
   }
@@ -98,6 +177,9 @@ export function AuthProvider({ children }) {
     const newUser = { uid: `user-${Date.now()}`, email: email.trim(), password, displayName, photoURL: null, provider: 'email', emailVerified: false, lastLoginAt: new Date().toISOString() };
     registerUser(newUser);
     setUser(persistSession(newUser));
+    const token = generateToken();
+    storeVerifyToken(token, newUser.uid, newUser.email);
+    return { token, email: newUser.email };
   }
 
   async function loginWithGoogle() {
@@ -105,6 +187,7 @@ export function AuthProvider({ children }) {
     setUser(persistSession({
       uid: 'google-mock-001', email: 'google.demo@gmail.com',
       displayName: 'Google Demo', photoURL: null, provider: 'google',
+      emailVerified: true, lastLoginAt: new Date().toISOString(),
     }));
   }
 
@@ -113,6 +196,7 @@ export function AuthProvider({ children }) {
     setUser(persistSession({
       uid: 'facebook-mock-001', email: 'facebook.demo@example.com',
       displayName: 'Facebook Demo', photoURL: null, provider: 'facebook',
+      emailVerified: true, lastLoginAt: new Date().toISOString(),
     }));
   }
 
@@ -164,8 +248,43 @@ export function AuthProvider({ children }) {
     registerUser({ ...found, password: newPassword });
   }
 
-  async function resendVerification() {
-    await delay(800);
+  async function createPasswordResetToken(email) {
+    await delay(700);
+    const users = getAllUsers();
+    const found = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (!found) throw { code: 'auth/user-not-found' };
+    const token = generateToken();
+    storeResetToken(token, found.uid, found.email);
+    return { token, email: found.email };
+  }
+
+  async function resetPasswordWithToken(token, newPassword) {
+    await delay(500);
+    if (!newPassword || newPassword.length < 6) throw { code: 'auth/weak-password' };
+    const data = consumeResetToken(token);
+    if (!data) throw { code: 'auth/invalid-action-code' };
+    const allUsers = getAllUsers();
+    const found = allUsers.find(u => u.uid === data.uid);
+    if (!found) throw { code: 'auth/user-not-found' };
+    registerUser({ ...found, password: newPassword });
+  }
+
+  function sendVerificationEmail() {
+    if (!user) return null;
+    const token = generateToken();
+    storeVerifyToken(token, user.uid, user.email);
+    return { token, email: user.email };
+  }
+
+  function verifyEmailWithToken(token) {
+    const data = consumeVerifyToken(token);
+    if (!data) return false;
+    const allUsers = getAllUsers();
+    const found = allUsers.find(u => u.uid === data.uid);
+    if (found) registerUser({ ...found, emailVerified: true });
+    if (user && user.uid === data.uid) {
+      setUser(persistSession({ ...user, emailVerified: true }));
+    }
     return true;
   }
 
@@ -176,7 +295,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, authLoading, login, register, loginWithGoogle, loginWithFacebook, logout, addAuthUser, resetPassword, updateProfile, changePassword, resendVerification }}>
+    <AuthContext.Provider value={{ user, authLoading, login, register, loginWithGoogle, loginWithFacebook, logout, addAuthUser, resetPassword, updateProfile, changePassword, sendVerificationEmail, verifyEmailWithToken, createPasswordResetToken, resetPasswordWithToken }}>
       {children}
     </AuthContext.Provider>
   );
@@ -203,6 +322,7 @@ export function firebaseErrorToHebrew(code) {
     'auth/popup-closed-by-user': '',
     'auth/cancelled-popup-request': '',
     'auth/internal-error':       'שגיאה פנימית — נסה שוב',
+    'auth/invalid-action-code':  'קישור האיפוס פג תוקף — בקש קישור חדש',
   };
   return map[code] ?? 'שגיאה בהתחברות — נסה שוב';
 }

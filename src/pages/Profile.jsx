@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth, firebaseErrorToHebrew } from '../context/AuthContext';
 import { useRoles, ROLES } from '../context/RolesContext';
 import { loadProjects } from '../data/projectsStore';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function fmtDateTime(iso) {
@@ -104,7 +105,7 @@ function Toast({ message, type, onClose }) {
 
 // ─── Main Profile page ────────────────────────────────────────────────────────
 export default function Profile({ setActivePage }) {
-  const { user, updateProfile, changePassword, resendVerification } = useAuth();
+  const { user, updateProfile, changePassword, sendVerificationEmail } = useAuth();
   const { currentSystemUser, currentRole, updateCurrentUserProfile, getAssignedProjectIds } = useRoles();
   const roleInfo = ROLES[currentRole];
 
@@ -113,6 +114,7 @@ export default function Profile({ setActivePage }) {
   const [pwdSaving, setPwd]   = useState(false);
   const [resending, setRe]    = useState(false);
   const [resentDone, setReDone] = useState(false);
+  const [verifyModal, setVerifyModal] = useState(null); // null | { token, email }
 
   // Personal info fields
   const [displayName, setName]    = useState(user?.displayName ?? '');
@@ -195,15 +197,17 @@ export default function Profile({ setActivePage }) {
     }
   }
 
-  async function handleResend() {
+  function handleResend() {
     setRe(true);
-    try {
-      await resendVerification();
-      setReDone(true);
-      showToast('אימייל אימות נשלח!', 'info');
-    } finally {
+    setTimeout(() => {
+      const result = sendVerificationEmail();
+      if (result) {
+        setVerifyModal(result);
+        setReDone(true);
+        showToast('אימייל אימות נשלח!', 'info');
+      }
       setRe(false);
-    }
+    }, 600);
   }
 
   const isSocialLogin = user?.provider === 'google' || user?.provider === 'facebook';
@@ -406,6 +410,15 @@ export default function Profile({ setActivePage }) {
       </div>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      {verifyModal && (
+        <EmailVerificationModal
+          token={verifyModal.token}
+          email={verifyModal.email}
+          onVerified={() => { setVerifyModal(null); setReDone(false); }}
+          onClose={() => setVerifyModal(null)}
+        />
+      )}
     </div>
   );
 }

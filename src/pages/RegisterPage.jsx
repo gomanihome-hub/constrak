@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth, firebaseErrorToHebrew } from '../context/AuthContext';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 
 const TEAL = '#80cded';
 const TEAL_DARK = '#4fb8e0';
@@ -77,6 +78,7 @@ export default function RegisterPage({ onLogin }) {
   const [loading, setLoading]         = useState(null); // null | 'email' | 'google' | 'facebook'
   const [errors, setErrors]           = useState({});
   const [globalError, setGlobalError] = useState('');
+  const [verifyModal, setVerifyModal] = useState(null); // null | { token, email }
 
   function set(field) { return (val) => setForm((f) => ({ ...f, [field]: val })); }
 
@@ -99,8 +101,9 @@ export default function RegisterPage({ onLogin }) {
     setGlobalError('');
     setLoading('email');
     try {
-      await register(form.email, form.password, form.fullName);
-      // auth state change → App navigates automatically
+      const verification = await register(form.email, form.password, form.fullName);
+      // Show mock verification email popup immediately after registration
+      if (verification) setVerifyModal(verification);
     } catch (err) {
       const msg = firebaseErrorToHebrew(err.code);
       if (msg) setGlobalError(msg);
@@ -256,6 +259,15 @@ export default function RegisterPage({ onLogin }) {
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {verifyModal && (
+        <EmailVerificationModal
+          token={verifyModal.token}
+          email={verifyModal.email}
+          onVerified={() => setVerifyModal(null)}
+          onClose={() => setVerifyModal(null)}
+        />
+      )}
     </div>
   );
 }
